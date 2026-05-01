@@ -1,0 +1,330 @@
+import { useState } from "react"
+
+const businesses = [
+  { id:1, name:"Crème by Clara", category:"Food & Drinks", desc:"Handcrafted French pastries made fresh every weekend", emoji:"🥐", uni:"NUS", founder:"Clara Tan", status:"approved" },
+  { id:2, name:"ThreadsXo", category:"Fashion", desc:"Upcycled & thrifted fashion with a streetwear edge", emoji:"👗", uni:"NTU", founder:"Marcus Lim", status:"approved" },
+  { id:3, name:"Stitch & Soul", category:"Handmade", desc:"Custom crochet plushies, keychains & accessories", emoji:"🧶", uni:"SMU", founder:"Priya Nair", status:"approved" },
+  { id:4, name:"PixelBrew Studio", category:"Digital", desc:"Custom digital art, stickers and Notion templates", emoji:"🎨", uni:"NTU", founder:"Alvin Koh", status:"approved" },
+  { id:5, name:"GlowLab SG", category:"Health", desc:"Handmade skincare and lip balms with natural ingredients", emoji:"🌿", uni:"NUS", founder:"Sophie Chen", status:"approved" },
+  { id:6, name:"Boba Theory", category:"Food & Drinks", desc:"Premium DIY boba kits delivered to your door", emoji:"🧋", uni:"SUTD", founder:"Ryan Ong", status:"pending" },
+]
+
+const allProducts = [
+  { id:1, name:"Croissant Box (6 pcs)", bizId:1, price:22, emoji:"🥐", desc:"Buttery all-butter croissants, baked fresh" },
+  { id:2, name:"Matcha Madeleine Set", bizId:1, price:18, emoji:"🍵", desc:"12 pieces of matcha madeleines" },
+  { id:3, name:"Vintage Denim Jacket", bizId:2, price:45, emoji:"🧥", desc:"Upcycled Y2K denim, one of a kind" },
+  { id:4, name:"Graphic Tee Bundle", bizId:2, price:35, emoji:"👕", desc:"2 custom graphic tees" },
+  { id:5, name:"Custom Crochet Plushie", bizId:3, price:38, emoji:"🧸", desc:"Made to order, any character" },
+  { id:6, name:"Notion Template Pack", bizId:4, price:12, emoji:"📋", desc:"5 aesthetic Notion templates" },
+  { id:7, name:"Rose Glow Facial Oil", bizId:5, price:28, emoji:"🌹", desc:"Natural rosehip & jojoba blend" },
+  { id:8, name:"Honey Lip Set (3 pcs)", bizId:5, price:15, emoji:"🍯", desc:"3 flavours of handmade lip balm" },
+]
+
+const s = {
+  page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
+  center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
+  logo:{fontSize:"32px",fontWeight:"800",marginBottom:"8px"},
+  accent:{color:"#C8F135"},
+  sub:{color:"#9090A8",fontSize:"14px",marginBottom:"2.5rem"},
+  cards:{display:"flex",gap:"1rem",flexWrap:"wrap",justifyContent:"center"},
+  portalCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem 1.5rem",width:"200px",cursor:"pointer",textAlign:"center"},
+  topbar:{background:"#111118",borderBottom:"1px solid #2A2A38",padding:"0 1.5rem",height:"56px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0},
+  main:{padding:"1.5rem",maxWidth:"1100px",margin:"0 auto"},
+  grid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"1rem"},
+  card:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",overflow:"hidden",cursor:"pointer"},
+  cardImg:{height:"120px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"48px",background:"#1A1A24"},
+  cardBody:{padding:"1rem"},
+  tag:{fontSize:"10px",padding:"3px 8px",background:"#1A1A24",borderRadius:"20px",color:"#9090A8"},
+  btn:{padding:"8px 16px",borderRadius:"8px",border:"none",cursor:"pointer",fontWeight:"600",fontSize:"13px",fontFamily:"inherit"},
+  btnAccent:{background:"#C8F135",color:"#0A0A0F"},
+  btnOutline:{background:"transparent",border:"1px solid #2A2A38",color:"#9090A8"},
+  btnDanger:{background:"rgba(255,77,106,0.15)",border:"1px solid rgba(255,77,106,0.2)",color:"#FF4D6A"},
+  btnSuccess:{background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.2)",color:"#22C55E"},
+  input:{width:"100%",padding:"10px 14px",background:"#1A1A24",border:"1px solid #2A2A38",borderRadius:"8px",color:"#F0F0F5",fontSize:"14px",fontFamily:"inherit",marginBottom:"1rem",boxSizing:"border-box"},
+  statCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem"},
+  statsGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:"1rem",marginBottom:"1.5rem"},
+  navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
+}
+
+export default function App() {
+  const [portal, setPortal] = useState(null)
+  const [view, setView] = useState("home")
+  const [cart, setCart] = useState([])
+  const [products, setProducts] = useState(allProducts)
+  const [bizList, setBizList] = useState(businesses)
+  const [applications, setApplications] = useState([
+    { id:1, bizName:"Boba Theory", founder:"Ryan Ong", uni:"SUTD", category:"Food & Drinks", email:"ryan@student.sutd.edu.sg", status:"pending", date:"2 May 2026" },
+    { id:2, bizName:"CoachBot SG", founder:"Wei Jie Tan", uni:"NUS", category:"Services", email:"weijie@u.nus.edu", status:"pending", date:"1 May 2026" },
+  ])
+  const [selectedBiz, setSelectedBiz] = useState(null)
+  const [newProduct, setNewProduct] = useState({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
+  const [toast, setToast] = useState(null)
+  const [activeFilter, setActiveFilter] = useState("All")
+
+  const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
+  const addToCart = (p) => { setCart(c => { const e=c.find(x=>x.id===p.id); return e?c.map(x=>x.id===p.id?{...x,qty:x.qty+1}:x):[...c,{...p,qty:1}] }); showToast(`✓ ${p.name} added to cart!`) }
+  const cartCount = cart.reduce((a,b)=>a+b.qty,0)
+  const cartTotal = cart.reduce((a,b)=>a+b.price*b.qty,0)
+
+  const enterPortal = (p) => { setPortal(p); setView("home") }
+
+  const categories = ["All","Food & Drinks","Fashion","Handmade","Digital","Health"]
+  const approvedBiz = bizList.filter(b=>b.status==="approved")
+  const filteredBiz = activeFilter==="All"?approvedBiz:approvedBiz.filter(b=>b.category===activeFilter)
+
+  const founderBiz = bizList[0]
+  const founderProducts = products.filter(p=>p.bizId===founderBiz.id)
+
+  const approve = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"approved"}:x)); setBizList(b=>b.map(x=>x.name===applications.find(a=>a.id===id)?.bizName?{...x,status:"approved"}:x)); showToast("✓ Application approved!") }
+  const reject = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"rejected"}:x)); showToast("✗ Application rejected") }
+
+  const addProduct = () => {
+    if(!newProduct.name||!newProduct.price){showToast("⚠️ Fill in name and price");return}
+    const p={...newProduct,id:Date.now(),bizId:founderBiz.id,price:parseFloat(newProduct.price),emoji:newProduct.emoji||"📦"}
+    setProducts(prev=>[...prev,p])
+    setNewProduct({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
+    showToast("✓ Product added!")
+  }
+
+  if(!portal) return (
+    <div style={{...s.page,...s.center}}>
+      <div style={s.logo}>Foundr<span style={s.accent}>SG</span></div>
+      <div style={s.sub}>Singapore's student business marketplace</div>
+      <div style={s.cards}>
+        {[["🛍️","Consumer","Shop from student businesses","#C8F135"],["🚀","Founder","Manage your student store","#A78BFA"],["⚡","Admin","Manage the platform","#FF4D6A"]].map(([icon,label,desc,color])=>(
+          <div key={label} onClick={()=>enterPortal(label.toLowerCase())} style={s.portalCard}>
+            <div style={{fontSize:"36px",marginBottom:"1rem"}}>{icon}</div>
+            <div style={{fontWeight:"700",marginBottom:"6px"}}>{label}</div>
+            <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"12px"}}>{desc}</div>
+            <div style={{fontSize:"11px",padding:"3px 10px",borderRadius:"20px",background:`${color}22`,color,display:"inline-block",fontWeight:"600"}}>{label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
+  return (
+    <div style={s.page}>
+      {toast&&<div style={{position:"fixed",bottom:"1.5rem",right:"1.5rem",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"12px 16px",fontSize:"13px",zIndex:999,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>{toast}</div>}
+
+      <div style={s.topbar}>
+        <div style={{fontWeight:"800",fontSize:"18px"}}>Foundr<span style={s.accent}>SG</span></div>
+        <div style={{display:"flex",gap:"4px"}}>
+          {portal==="consumer"&&<>
+            <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Discover</button>
+            <button style={{...s.navBtn,...(view==="shop"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("shop")}>Shop</button>
+            <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#C8F135",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
+          </>}
+          {portal==="founder"&&<>
+            <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Dashboard</button>
+            <button style={{...s.navBtn,...(view==="products"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("products")}>Products</button>
+          </>}
+          {portal==="admin"&&<>
+            <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Overview</button>
+            <button style={{...s.navBtn,...(view==="applications"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("applications")}>Applications</button>
+            <button style={{...s.navBtn,...(view==="businesses"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("businesses")}>Businesses</button>
+          </>}
+        </div>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setPortal(null)}>← Switch</button>
+      </div>
+
+      <div style={s.main}>
+        {portal==="consumer"&&view==="home"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Discover Student Businesses 🔍</h2><p style={{color:"#9090A8",fontSize:"14px"}}>All verified student-run</p></div>
+            <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"1.25rem"}}>
+              {categories.map(c=><button key={c} onClick={()=>setActiveFilter(c)} style={{...s.btn,padding:"5px 14px",fontSize:"12px",background:activeFilter===c?"#C8F135":"transparent",color:activeFilter===c?"#0A0A0F":"#9090A8",border:"1px solid "+(activeFilter===c?"#C8F135":"#2A2A38")}}>{c}</button>)}
+            </div>
+            <div style={s.grid}>
+              {filteredBiz.map(b=>(
+                <div key={b.id} style={s.card} onClick={()=>{setSelectedBiz(b);setView("bizdetail")}}>
+                  <div style={s.cardImg}>{b.emoji}</div>
+                  <div style={s.cardBody}>
+                    <div style={{fontWeight:"600",marginBottom:"4px"}}>{b.name}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{b.desc}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={s.tag}>{b.uni}</span>
+                      <span style={{fontSize:"10px",color:"#C8F135",fontWeight:"600"}}>✓ Verified</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {portal==="consumer"&&view==="bizdetail"&&selectedBiz&&(
+          <div>
+            <button style={{...s.btn,...s.btnOutline,marginBottom:"1rem",fontSize:"12px"}} onClick={()=>setView("home")}>← Back</button>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem",display:"flex",gap:"1rem",alignItems:"center"}}>
+              <div style={{fontSize:"40px",width:"64px",height:"64px",background:"#1A1A24",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{selectedBiz.emoji}</div>
+              <div>
+                <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"2px"}}>{selectedBiz.name} <span style={{color:"#C8F135",fontSize:"13px"}}>✓</span></div>
+                <div style={{color:"#9090A8",fontSize:"13px"}}>{selectedBiz.category} · {selectedBiz.uni} · by {selectedBiz.founder}</div>
+                <div style={{color:"#9090A8",fontSize:"13px",marginTop:"6px"}}>{selectedBiz.desc}</div>
+              </div>
+            </div>
+            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Products</div>
+            <div style={s.grid}>
+              {products.filter(p=>p.bizId===selectedBiz.id).map(p=>(
+                <div key={p.id} style={s.card}>
+                  <div style={s.cardImg}>{p.emoji}</div>
+                  <div style={s.cardBody}>
+                    <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
+                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {portal==="consumer"&&view==="shop"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Shop All Products 🛒</h2></div>
+            <div style={s.grid}>
+              {products.map(p=>{const b=bizList.find(x=>x.id===p.bizId);return(
+                <div key={p.id} style={s.card}>
+                  <div style={s.cardImg}>{p.emoji}</div>
+                  <div style={s.cardBody}>
+                    <div style={{fontWeight:"600",marginBottom:"2px"}}>{p.name}</div>
+                    <div style={{fontSize:"11px",color:"#9090A8",marginBottom:"6px"}}>by {b?.name}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
+                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>
+                  </div>
+                </div>
+              )})}
+            </div>
+          </div>
+        )}
+
+        {portal==="consumer"&&view==="cart"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Your Cart 🛒</h2></div>
+            {cart.length===0?<div style={{textAlign:"center",padding:"3rem",color:"#9090A8"}}><div style={{fontSize:"40px",marginBottom:"1rem"}}>🛒</div><p>Your cart is empty</p></div>:
+            <div>
+              {cart.map(c=>(
+                <div key={c.id} style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 0",borderBottom:"1px solid #2A2A38"}}>
+                  <div style={{fontSize:"28px",width:"44px",height:"44px",background:"#1A1A24",borderRadius:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>{c.emoji}</div>
+                  <div style={{flex:1}}><div style={{fontWeight:"600",fontSize:"13px"}}>{c.name}</div><div style={{fontSize:"12px",color:"#9090A8"}}>Qty: {c.qty}</div></div>
+                  <div style={{fontWeight:"700",color:"#C8F135"}}>${c.price*c.qty}</div>
+                </div>
+              ))}
+              <div style={{marginTop:"1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div><div style={{fontSize:"12px",color:"#9090A8"}}>Total</div><div style={{fontSize:"24px",fontWeight:"800",color:"#C8F135"}}>${cartTotal}</div></div>
+                <button style={{...s.btn,...s.btnAccent}} onClick={()=>{setCart([]);showToast("🎉 Order placed!")}}>Checkout →</button>
+              </div>
+            </div>}
+          </div>
+        )}
+
+        {portal==="founder"&&view==="home"&&(
+          <div>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem",display:"flex",gap:"1rem",alignItems:"center"}}>
+              <div style={{fontSize:"32px",width:"56px",height:"56px",background:"#1A1A24",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{founderBiz.emoji}</div>
+              <div><div style={{fontWeight:"700",fontSize:"18px"}}>{founderBiz.name}</div><div style={{color:"#9090A8",fontSize:"13px"}}>{founderBiz.category} · {founderBiz.uni} · <span style={{color:"#22C55E",fontWeight:"600"}}>✓ Approved</span></div></div>
+            </div>
+            <div style={s.statsGrid}>
+              {[["Products",founderProducts.length,"Listed"],["Revenue","$"+(founderProducts.reduce((a,b)=>a+b.price,0)),"SGD"],["Views","142","This week"],["Orders","3","All time"]].map(([l,v,sub])=>(
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {portal==="founder"&&view==="products"&&(
+          <div>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.5rem"}}>
+              <h2 style={{fontWeight:"800"}}>My Products</h2>
+            </div>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
+              <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>+ Add New Product</div>
+              <input style={s.input} placeholder="Product name" value={newProduct.name} onChange={e=>setNewProduct(p=>({...p,name:e.target.value}))} />
+              <input style={s.input} placeholder="Description" value={newProduct.desc} onChange={e=>setNewProduct(p=>({...p,desc:e.target.value}))} />
+              <input style={s.input} placeholder="Price (SGD)" type="number" value={newProduct.price} onChange={e=>setNewProduct(p=>({...p,price:e.target.value}))} />
+              <input style={s.input} placeholder="Emoji icon e.g. 🎀" value={newProduct.emoji} onChange={e=>setNewProduct(p=>({...p,emoji:e.target.value}))} />
+              <button style={{...s.btn,...s.btnAccent}} onClick={addProduct}>Add Product</button>
+            </div>
+            <div style={s.grid}>
+              {founderProducts.map(p=>(
+                <div key={p.id} style={s.card}>
+                  <div style={s.cardImg}>{p.emoji}</div>
+                  <div style={s.cardBody}>
+                    <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
+                    <button style={{...s.btn,...s.btnDanger,width:"100%",fontSize:"12px"}} onClick={()=>{setProducts(prev=>prev.filter(x=>x.id!==p.id));showToast("🗑️ Product removed")}}>Remove</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {portal==="admin"&&view==="home"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
+            <div style={s.statsGrid}>
+              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Products",products.length,"Listed"],["Applications",applications.length,"Total"]].map(([l,v,sub])=>(
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+              ))}
+            </div>
+            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem",paddingBottom:"6px",borderBottom:"1px solid #2A2A38"}}>Pending Applications</div>
+            {applications.filter(a=>a.status==="pending").map(a=>(
+              <div key={a.id} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
+                <div><div style={{fontWeight:"600"}}>{a.bizName}</div><div style={{fontSize:"12px",color:"#9090A8"}}>{a.founder} · {a.uni} · {a.date}</div></div>
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button style={{...s.btn,...s.btnSuccess,fontSize:"12px"}} onClick={()=>approve(a.id)}>Approve</button>
+                  <button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>reject(a.id)}>Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {portal==="admin"&&view==="applications"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>All Applications</h2></div>
+            {applications.map(a=>(
+              <div key={a.id} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
+                <div>
+                  <div style={{fontWeight:"600"}}>{a.bizName}</div>
+                  <div style={{fontSize:"12px",color:"#9090A8"}}>{a.founder} · {a.uni} · {a.email}</div>
+                </div>
+                <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                  <span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"20px",background:a.status==="approved"?"rgba(34,197,94,0.15)":a.status==="rejected"?"rgba(255,77,106,0.15)":"rgba(249,115,22,0.15)",color:a.status==="approved"?"#22C55E":a.status==="rejected"?"#FF4D6A":"#F97316",fontWeight:"600"}}>{a.status}</span>
+                  {a.status==="pending"&&<><button style={{...s.btn,...s.btnSuccess,fontSize:"12px"}} onClick={()=>approve(a.id)}>Approve</button><button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>reject(a.id)}>Reject</button></>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {portal==="admin"&&view==="businesses"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>All Businesses</h2></div>
+            <div style={s.grid}>
+              {bizList.map(b=>(
+                <div key={b.id} style={s.card}>
+                  <div style={s.cardImg}>{b.emoji}</div>
+                  <div style={s.cardBody}>
+                    <div style={{fontWeight:"600",marginBottom:"4px"}}>{b.name}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{b.desc}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={s.tag}>{b.uni}</span>
+                      <span style={{fontSize:"11px",padding:"3px 8px",borderRadius:"20px",background:b.status==="approved"?"rgba(34,197,94,0.15)":"rgba(249,115,22,0.15)",color:b.status==="approved"?"#22C55E":"#F97316",fontWeight:"600"}}>{b.status}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  )
+}
