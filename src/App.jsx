@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 const businesses = [
   { id:1, name:"Crème by Clara", category:"Food & Drinks", desc:"Handcrafted French pastries made fresh every weekend", emoji:"🥐", uni:"NUS", founder:"Clara Tan", status:"approved" },
@@ -28,7 +28,7 @@ const s = {
   sub:{color:"#9090A8",fontSize:"14px",marginBottom:"2.5rem"},
   cards:{display:"flex",gap:"1rem",flexWrap:"wrap",justifyContent:"center"},
   portalCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem 1.5rem",width:"200px",cursor:"pointer",textAlign:"center"},
-  topbar:{background:"#111118",borderBottom:"1px solid #2A2A38",padding:"0 1.5rem",height:"56px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0},
+  topbar:{background:"#111118",borderBottom:"1px solid #2A2A38",padding:"0 1.5rem",height:"56px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
   main:{padding:"1.5rem",maxWidth:"1100px",margin:"0 auto"},
   grid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"1rem"},
   card:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",overflow:"hidden",cursor:"pointer"},
@@ -46,6 +46,52 @@ const s = {
   navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
 }
 
+// Scrolling ticker component
+function Ticker({ items }) {
+  return (
+    <div style={{background:"#0D0D14",borderBottom:"1px solid #2A2A38",overflow:"hidden",height:"32px",display:"flex",alignItems:"center"}}>
+      <div style={{display:"flex",gap:"0px",animation:"scroll 30s linear infinite",whiteSpace:"nowrap"}}>
+        {[...items,...items].map((item,i)=>(
+          <span key={i} style={{fontSize:"12px",color:"#9090A8",padding:"0 2rem"}}>
+            <span style={{color:"#C8F135",marginRight:"6px"}}>{item.emoji}</span>
+            {item.text}
+          </span>
+        ))}
+      </div>
+      <style>{`@keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+    </div>
+  )
+}
+
+// Admin login page
+function AdminLogin({ onLogin }) {
+  const [pw, setPw] = useState("")
+  const [error, setError] = useState(false)
+  const handle = () => {
+    if(pw === "foundrsg2026") { onLogin() }
+    else { setError(true); setTimeout(()=>setError(false),2000) }
+  }
+  return (
+    <div style={{...s.page,...s.center}}>
+      <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem",width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <div style={{fontSize:"32px",marginBottom:"1rem"}}>⚡</div>
+        <h2 style={{fontWeight:"800",marginBottom:"6px"}}>Admin Access</h2>
+        <p style={{color:"#9090A8",fontSize:"13px",marginBottom:"1.5rem"}}>Foundr SG — restricted area</p>
+        <input
+          style={{...s.input,textAlign:"center",letterSpacing:"0.1em",borderColor:error?"#FF4D6A":"#2A2A38"}}
+          type="password"
+          placeholder="Enter password"
+          value={pw}
+          onChange={e=>setPw(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&handle()}
+        />
+        {error&&<p style={{color:"#FF4D6A",fontSize:"12px",marginTop:"-0.75rem",marginBottom:"1rem"}}>Incorrect password</p>}
+        <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={handle}>Enter →</button>
+      </div>
+    </div>
+  )
+}
+
 export default function App() {
   const [portal, setPortal] = useState(null)
   const [view, setView] = useState("home")
@@ -60,24 +106,37 @@ export default function App() {
   const [newProduct, setNewProduct] = useState({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
   const [toast, setToast] = useState(null)
   const [activeFilter, setActiveFilter] = useState("All")
+  const [adminUnlocked, setAdminUnlocked] = useState(false)
+  const [feedItems, setFeedItems] = useState([
+    {emoji:"🆕", text:"Stitch & Soul just joined Foundr SG!"},
+    {emoji:"🛍️", text:"New product: Rose Glow Facial Oil by GlowLab SG"},
+    {emoji:"🆕", text:"PixelBrew Studio just joined Foundr SG!"},
+    {emoji:"🛍️", text:"New product: Croissant Box by Crème by Clara"},
+    {emoji:"🆕", text:"ThreadsXo just joined Foundr SG!"},
+    {emoji:"🛍️", text:"New product: Custom Crochet Plushie by Stitch & Soul"},
+    {emoji:"🎉", text:"50+ student businesses and counting!"},
+  ])
+  const [newFeedItem, setNewFeedItem] = useState("")
+
+  // Check for secret admin URL
+  useEffect(() => {
+    if(window.location.hash === "#/admin") {
+      setPortal("admin")
+    }
+  }, [])
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
   const addToCart = (p) => { setCart(c => { const e=c.find(x=>x.id===p.id); return e?c.map(x=>x.id===p.id?{...x,qty:x.qty+1}:x):[...c,{...p,qty:1}] }); showToast(`✓ ${p.name} added to cart!`) }
   const cartCount = cart.reduce((a,b)=>a+b.qty,0)
   const cartTotal = cart.reduce((a,b)=>a+b.price*b.qty,0)
-
   const enterPortal = (p) => { setPortal(p); setView("home") }
-
   const categories = ["All","Food & Drinks","Fashion","Handmade","Digital","Health"]
   const approvedBiz = bizList.filter(b=>b.status==="approved")
   const filteredBiz = activeFilter==="All"?approvedBiz:approvedBiz.filter(b=>b.category===activeFilter)
-
   const founderBiz = bizList[0]
   const founderProducts = products.filter(p=>p.bizId===founderBiz.id)
-
   const approve = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"approved"}:x)); setBizList(b=>b.map(x=>x.name===applications.find(a=>a.id===id)?.bizName?{...x,status:"approved"}:x)); showToast("✓ Application approved!") }
   const reject = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"rejected"}:x)); showToast("✗ Application rejected") }
-
   const addProduct = () => {
     if(!newProduct.name||!newProduct.price){showToast("⚠️ Fill in name and price");return}
     const p={...newProduct,id:Date.now(),bizId:founderBiz.id,price:parseFloat(newProduct.price),emoji:newProduct.emoji||"📦"}
@@ -85,13 +144,25 @@ export default function App() {
     setNewProduct({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
     showToast("✓ Product added!")
   }
+  const addFeedItem = () => {
+    if(!newFeedItem.trim()){showToast("⚠️ Type something first");return}
+    setFeedItems(f=>[...f,{emoji:"📢",text:newFeedItem}])
+    setNewFeedItem("")
+    showToast("✓ Feed updated!")
+  }
 
+  // Admin portal — show login first
+  if(portal==="admin" && !adminUnlocked) {
+    return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
+  }
+
+  // Portal selector — no admin option shown
   if(!portal) return (
     <div style={{...s.page,...s.center}}>
       <div style={s.logo}>Foundr<span style={s.accent}>SG</span></div>
       <div style={s.sub}>Singapore's student business marketplace</div>
       <div style={s.cards}>
-        {[["🛍️","Consumer","Shop from student businesses","#C8F135"],["🚀","Founder","Manage your student store","#A78BFA"],["⚡","Admin","Manage the platform","#FF4D6A"]].map(([icon,label,desc,color])=>(
+        {[["🛍️","Consumer","Shop from student businesses","#C8F135"],["🚀","Founder","Manage your student store","#A78BFA"]].map(([icon,label,desc,color])=>(
           <div key={label} onClick={()=>enterPortal(label.toLowerCase())} style={s.portalCard}>
             <div style={{fontSize:"36px",marginBottom:"1rem"}}>{icon}</div>
             <div style={{fontWeight:"700",marginBottom:"6px"}}>{label}</div>
@@ -100,6 +171,7 @@ export default function App() {
           </div>
         ))}
       </div>
+      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem"}}>v1.0 — foundrsg</p>
     </div>
   )
 
@@ -123,12 +195,18 @@ export default function App() {
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Overview</button>
             <button style={{...s.navBtn,...(view==="applications"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("applications")}>Applications</button>
             <button style={{...s.navBtn,...(view==="businesses"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("businesses")}>Businesses</button>
+            <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed</button>
           </>}
         </div>
-        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setPortal(null)}>← Switch</button>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>{setPortal(null);setAdminUnlocked(false)}}>← Switch</button>
       </div>
 
+      {/* SCROLLING TICKER */}
+      <Ticker items={feedItems} />
+
       <div style={s.main}>
+
+        {/* CONSUMER */}
         {portal==="consumer"&&view==="home"&&(
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Discover Student Businesses 🔍</h2><p style={{color:"#9090A8",fontSize:"14px"}}>All verified student-run</p></div>
@@ -221,6 +299,7 @@ export default function App() {
           </div>
         )}
 
+        {/* FOUNDER */}
         {portal==="founder"&&view==="home"&&(
           <div>
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem",display:"flex",gap:"1rem",alignItems:"center"}}>
@@ -264,6 +343,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ADMIN */}
         {portal==="admin"&&view==="home"&&(
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
@@ -321,6 +401,24 @@ export default function App() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {portal==="admin"&&view==="feed"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Manage Feed 📢</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Control what scrolls across the ticker</p></div>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
+              <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>+ Add New Feed Item</div>
+              <input style={s.input} placeholder="e.g. 🆕 New business just joined!" value={newFeedItem} onChange={e=>setNewFeedItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addFeedItem()} />
+              <button style={{...s.btn,...s.btnAccent}} onClick={addFeedItem}>Add to Feed</button>
+            </div>
+            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Current Feed Items</div>
+            {feedItems.map((f,i)=>(
+              <div key={i} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"10px",padding:"10px 14px",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                <span style={{fontSize:"13px"}}>{f.emoji} {f.text}</span>
+                <button style={{...s.btn,...s.btnDanger,fontSize:"11px",padding:"4px 10px"}} onClick={()=>setFeedItems(items=>items.filter((_,idx)=>idx!==i))}>Remove</button>
+              </div>
+            ))}
           </div>
         )}
 
