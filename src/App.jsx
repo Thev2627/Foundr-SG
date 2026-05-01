@@ -1,4 +1,10 @@
-import { useState, useEffect } from "react"
+import { useState, useRef } from "react"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(
+  "https://jhyblauvdqvatqvcqetu.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoeWJsYXV2ZHF2YXRxdmNxZXR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTU0NDEsImV4cCI6MjA5MzE5MTQ0MX0.8FaXRIYvw18wyLIoFznGd8_g5zaxsXOPukzS8uWfL3g"
+)
 
 const businesses = [
   { id:1, name:"Crème by Clara", category:"Food & Drinks", desc:"Handcrafted French pastries made fresh every weekend", emoji:"🥐", uni:"NUS", founder:"Clara Tan", status:"approved" },
@@ -6,7 +12,6 @@ const businesses = [
   { id:3, name:"Stitch & Soul", category:"Handmade", desc:"Custom crochet plushies, keychains & accessories", emoji:"🧶", uni:"SMU", founder:"Priya Nair", status:"approved" },
   { id:4, name:"PixelBrew Studio", category:"Digital", desc:"Custom digital art, stickers and Notion templates", emoji:"🎨", uni:"NTU", founder:"Alvin Koh", status:"approved" },
   { id:5, name:"GlowLab SG", category:"Health", desc:"Handmade skincare and lip balms with natural ingredients", emoji:"🌿", uni:"NUS", founder:"Sophie Chen", status:"approved" },
-  { id:6, name:"Boba Theory", category:"Food & Drinks", desc:"Premium DIY boba kits delivered to your door", emoji:"🧋", uni:"SUTD", founder:"Ryan Ong", status:"pending" },
 ]
 
 const allProducts = [
@@ -46,24 +51,41 @@ const s = {
   navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
 }
 
-// Scrolling ticker component
-function Ticker({ items }) {
+// TikTok style feed
+function MediaFeed({ posts, onDelete, isAdmin }) {
+  const [current, setCurrent] = useState(0)
+  if(posts.length === 0) return (
+    <div style={{textAlign:"center",padding:"3rem",color:"#9090A8"}}>
+      <div style={{fontSize:"40px",marginBottom:"1rem"}}>📱</div>
+      <p>No posts yet — check back soon!</p>
+    </div>
+  )
+  const post = posts[current]
   return (
-    <div style={{background:"#0D0D14",borderBottom:"1px solid #2A2A38",overflow:"hidden",height:"32px",display:"flex",alignItems:"center"}}>
-      <div style={{display:"flex",gap:"0px",animation:"scroll 30s linear infinite",whiteSpace:"nowrap"}}>
-        {[...items,...items].map((item,i)=>(
-          <span key={i} style={{fontSize:"12px",color:"#9090A8",padding:"0 2rem"}}>
-            <span style={{color:"#C8F135",marginRight:"6px"}}>{item.emoji}</span>
-            {item.text}
-          </span>
-        ))}
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1rem"}}>
+      <div style={{width:"100%",maxWidth:"400px",background:"#16161F",borderRadius:"16px",overflow:"hidden",border:"1px solid #2A2A38",position:"relative"}}>
+        {post.type === "video" ? (
+          <video src={post.url} controls autoPlay muted loop style={{width:"100%",maxHeight:"600px",objectFit:"cover",display:"block"}} />
+        ) : (
+          <img src={post.url} alt={post.caption} style={{width:"100%",maxHeight:"600px",objectFit:"cover",display:"block"}} />
+        )}
+        <div style={{padding:"1rem"}}>
+          <div style={{fontWeight:"600",marginBottom:"4px"}}>{post.caption}</div>
+          <div style={{fontSize:"12px",color:"#9090A8"}}>{post.businessName} · {post.date}</div>
+        </div>
+        {isAdmin && (
+          <button style={{position:"absolute",top:"10px",right:"10px",...s.btn,...s.btnDanger,fontSize:"11px",padding:"4px 10px"}} onClick={()=>onDelete(post.id)}>Remove</button>
+        )}
       </div>
-      <style>{`@keyframes scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }`}</style>
+      <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setCurrent(c=>Math.max(0,c-1))} disabled={current===0}>← Prev</button>
+        <span style={{fontSize:"12px",color:"#9090A8"}}>{current+1} / {posts.length}</span>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setCurrent(c=>Math.min(posts.length-1,c+1))} disabled={current===posts.length-1}>Next →</button>
+      </div>
     </div>
   )
 }
 
-// Admin login page
 function AdminLogin({ onLogin }) {
   const [pw, setPw] = useState("")
   const [error, setError] = useState(false)
@@ -77,14 +99,7 @@ function AdminLogin({ onLogin }) {
         <div style={{fontSize:"32px",marginBottom:"1rem"}}>⚡</div>
         <h2 style={{fontWeight:"800",marginBottom:"6px"}}>Admin Access</h2>
         <p style={{color:"#9090A8",fontSize:"13px",marginBottom:"1.5rem"}}>Foundr SG — restricted area</p>
-        <input
-          style={{...s.input,textAlign:"center",letterSpacing:"0.1em",borderColor:error?"#FF4D6A":"#2A2A38"}}
-          type="password"
-          placeholder="Enter password"
-          value={pw}
-          onChange={e=>setPw(e.target.value)}
-          onKeyDown={e=>e.key==="Enter"&&handle()}
-        />
+        <input style={{...s.input,textAlign:"center",letterSpacing:"0.1em",borderColor:error?"#FF4D6A":"#2A2A38"}} type="password" placeholder="Enter password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} />
         {error&&<p style={{color:"#FF4D6A",fontSize:"12px",marginTop:"-0.75rem",marginBottom:"1rem"}}>Incorrect password</p>}
         <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={handle}>Enter →</button>
       </div>
@@ -107,23 +122,10 @@ export default function App() {
   const [toast, setToast] = useState(null)
   const [activeFilter, setActiveFilter] = useState("All")
   const [adminUnlocked, setAdminUnlocked] = useState(false)
-  const [feedItems, setFeedItems] = useState([
-    {emoji:"🆕", text:"Stitch & Soul just joined Foundr SG!"},
-    {emoji:"🛍️", text:"New product: Rose Glow Facial Oil by GlowLab SG"},
-    {emoji:"🆕", text:"PixelBrew Studio just joined Foundr SG!"},
-    {emoji:"🛍️", text:"New product: Croissant Box by Crème by Clara"},
-    {emoji:"🆕", text:"ThreadsXo just joined Foundr SG!"},
-    {emoji:"🛍️", text:"New product: Custom Crochet Plushie by Stitch & Soul"},
-    {emoji:"🎉", text:"50+ student businesses and counting!"},
-  ])
-  const [newFeedItem, setNewFeedItem] = useState("")
-
-  // Check for secret admin URL
-  useEffect(() => {
-    if(window.location.hash === "#/admin") {
-      setPortal("admin")
-    }
-  }, [])
+  const [posts, setPosts] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [newPost, setNewPost] = useState({caption:"",businessName:""})
+  const fileRef = useRef()
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
   const addToCart = (p) => { setCart(c => { const e=c.find(x=>x.id===p.id); return e?c.map(x=>x.id===p.id?{...x,qty:x.qty+1}:x):[...c,{...p,qty:1}] }); showToast(`✓ ${p.name} added to cart!`) }
@@ -144,19 +146,41 @@ export default function App() {
     setNewProduct({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
     showToast("✓ Product added!")
   }
-  const addFeedItem = () => {
-    if(!newFeedItem.trim()){showToast("⚠️ Type something first");return}
-    setFeedItems(f=>[...f,{emoji:"📢",text:newFeedItem}])
-    setNewFeedItem("")
-    showToast("✓ Feed updated!")
+
+  const uploadMedia = async (e) => {
+    const file = e.target.files[0]
+    if(!file) return
+    if(!newPost.caption||!newPost.businessName){showToast("⚠️ Fill in caption and business name first");return}
+    setUploading(true)
+    try {
+      const ext = file.name.split(".").pop()
+      const filename = `${Date.now()}.${ext}`
+      const { data, error } = await supabase.storage.from("media").upload(filename, file, { upsert: true })
+      if(error) throw error
+      const { data: urlData } = supabase.storage.from("media").getPublicUrl(filename)
+      const isVideo = file.type.startsWith("video")
+      const post = {
+        id: Date.now(),
+        url: urlData.publicUrl,
+        type: isVideo ? "video" : "image",
+        caption: newPost.caption,
+        businessName: newPost.businessName,
+        date: new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"})
+      }
+      setPosts(prev=>[post,...prev])
+      setNewPost({caption:"",businessName:""})
+      showToast("✓ Post uploaded!")
+    } catch(err) {
+      showToast("❌ Upload failed — check Supabase storage settings")
+      console.error(err)
+    }
+    setUploading(false)
   }
 
-  // Admin portal — show login first
-  if(portal==="admin" && !adminUnlocked) {
-    return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
-  }
+  const deletePost = (id) => { setPosts(prev=>prev.filter(p=>p.id!==id)); showToast("🗑️ Post removed") }
 
-  // Portal selector — no admin option shown
+  if(portal==="admin" && !adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
+
   if(!portal) return (
     <div style={{...s.page,...s.center}}>
       <div style={s.logo}>Foundr<span style={s.accent}>SG</span></div>
@@ -171,7 +195,7 @@ export default function App() {
           </div>
         ))}
       </div>
-      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem"}}>v1.0 — foundrsg</p>
+      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem"}} onClick={()=>setPortal("admin")} >v1.0</p>
     </div>
   )
 
@@ -185,26 +209,33 @@ export default function App() {
           {portal==="consumer"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Discover</button>
             <button style={{...s.navBtn,...(view==="shop"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("shop")}>Shop</button>
+            <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
             <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#C8F135",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
           </>}
           {portal==="founder"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Dashboard</button>
+            <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
             <button style={{...s.navBtn,...(view==="products"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("products")}>Products</button>
           </>}
           {portal==="admin"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Overview</button>
+            <button style={{...s.navBtn,...(view==="upload"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("upload")}>Upload Media</button>
             <button style={{...s.navBtn,...(view==="applications"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("applications")}>Applications</button>
             <button style={{...s.navBtn,...(view==="businesses"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("businesses")}>Businesses</button>
-            <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed</button>
           </>}
         </div>
         <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>{setPortal(null);setAdminUnlocked(false)}}>← Switch</button>
       </div>
 
-      {/* SCROLLING TICKER */}
-      <Ticker items={feedItems} />
-
       <div style={s.main}>
+
+        {/* FEED - shown to consumer and founder */}
+        {(portal==="consumer"||portal==="founder")&&view==="feed"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Featured 📱</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Latest from student businesses</p></div>
+            <MediaFeed posts={posts} isAdmin={false} onDelete={()=>{}} />
+          </div>
+        )}
 
         {/* CONSUMER */}
         {portal==="consumer"&&view==="home"&&(
@@ -348,7 +379,7 @@ export default function App() {
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
             <div style={s.statsGrid}>
-              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Products",products.length,"Listed"],["Applications",applications.length,"Total"]].map(([l,v,sub])=>(
+              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Products",products.length,"Listed"]].map(([l,v,sub])=>(
                 <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
@@ -362,6 +393,22 @@ export default function App() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {portal==="admin"&&view==="upload"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Upload images or videos to the feed</p></div>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem"}}>
+              <input style={s.input} placeholder="Business name e.g. Crème by Clara" value={newPost.businessName} onChange={e=>setNewPost(p=>({...p,businessName:e.target.value}))} />
+              <input style={s.input} placeholder="Caption e.g. Fresh croissants this Sunday!" value={newPost.caption} onChange={e=>setNewPost(p=>({...p,caption:e.target.value}))} />
+              <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={uploadMedia} />
+              <button style={{...s.btn,...s.btnAccent,width:"100%",padding:"12px"}} onClick={()=>fileRef.current.click()} disabled={uploading}>
+                {uploading ? "Uploading..." : "📁 Choose Image or Video"}
+              </button>
+            </div>
+            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Posted ({posts.length})</div>
+            <MediaFeed posts={posts} isAdmin={true} onDelete={deletePost} />
           </div>
         )}
 
@@ -401,24 +448,6 @@ export default function App() {
                 </div>
               ))}
             </div>
-          </div>
-        )}
-
-        {portal==="admin"&&view==="feed"&&(
-          <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Manage Feed 📢</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Control what scrolls across the ticker</p></div>
-            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
-              <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>+ Add New Feed Item</div>
-              <input style={s.input} placeholder="e.g. 🆕 New business just joined!" value={newFeedItem} onChange={e=>setNewFeedItem(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addFeedItem()} />
-              <button style={{...s.btn,...s.btnAccent}} onClick={addFeedItem}>Add to Feed</button>
-            </div>
-            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Current Feed Items</div>
-            {feedItems.map((f,i)=>(
-              <div key={i} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"10px",padding:"10px 14px",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <span style={{fontSize:"13px"}}>{f.emoji} {f.text}</span>
-                <button style={{...s.btn,...s.btnDanger,fontSize:"11px",padding:"4px 10px"}} onClick={()=>setFeedItems(items=>items.filter((_,idx)=>idx!==i))}>Remove</button>
-              </div>
-            ))}
           </div>
         )}
 
