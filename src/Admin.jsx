@@ -1,0 +1,258 @@
+import { useState, useRef, useEffect } from "react"
+import { createClient } from "@supabase/supabase-js"
+
+const supabase = createClient(
+  "https://jhyblauvdqvatqvcqetu.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpoeWJsYXV2ZHF2YXRxdmNxZXR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2MTU0NDEsImV4cCI6MjA5MzE5MTQ0MX0.8FaXRIYvw18wyLIoFznGd8_g5zaxsXOPukzS8uWfL3g"
+)
+
+const businesses = [
+  { id:1, name:"Crème by Clara", category:"Food & Drinks", desc:"Handcrafted French pastries made fresh every weekend", emoji:"🥐", uni:"NUS", founder:"Clara Tan", status:"approved" },
+  { id:2, name:"ThreadsXo", category:"Fashion", desc:"Upcycled & thrifted fashion with a streetwear edge", emoji:"👗", uni:"NTU", founder:"Marcus Lim", status:"approved" },
+  { id:3, name:"Stitch & Soul", category:"Handmade", desc:"Custom crochet plushies, keychains & accessories", emoji:"🧶", uni:"SMU", founder:"Priya Nair", status:"approved" },
+  { id:4, name:"PixelBrew Studio", category:"Digital", desc:"Custom digital art, stickers and Notion templates", emoji:"🎨", uni:"NTU", founder:"Alvin Koh", status:"approved" },
+  { id:5, name:"GlowLab SG", category:"Health", desc:"Handmade skincare and lip balms with natural ingredients", emoji:"🌿", uni:"NUS", founder:"Sophie Chen", status:"approved" },
+]
+
+const s = {
+  page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
+  center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
+  accent:{color:"#C8F135"},
+  btn:{padding:"8px 16px",borderRadius:"8px",border:"none",cursor:"pointer",fontWeight:"600",fontSize:"13px",fontFamily:"inherit"},
+  btnAccent:{background:"#C8F135",color:"#0A0A0F"},
+  btnOutline:{background:"transparent",border:"1px solid #2A2A38",color:"#9090A8"},
+  btnDanger:{background:"rgba(255,77,106,0.15)",border:"1px solid rgba(255,77,106,0.2)",color:"#FF4D6A"},
+  btnSuccess:{background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.2)",color:"#22C55E"},
+  input:{width:"100%",padding:"10px 14px",background:"#1A1A24",border:"1px solid #2A2A38",borderRadius:"8px",color:"#F0F0F5",fontSize:"14px",fontFamily:"inherit",marginBottom:"1rem",boxSizing:"border-box"},
+  topbar:{background:"#111118",borderBottom:"1px solid #2A2A38",padding:"0 1.5rem",height:"56px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,zIndex:100},
+  main:{padding:"1.5rem",maxWidth:"1100px",margin:"0 auto"},
+  grid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:"1rem"},
+  card:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",overflow:"hidden",cursor:"pointer"},
+  cardImg:{height:"120px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"48px",background:"#1A1A24"},
+  cardBody:{padding:"1rem"},
+  tag:{fontSize:"10px",padding:"3px 8px",background:"#1A1A24",borderRadius:"20px",color:"#9090A8"},
+  statCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem"},
+  statsGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:"1rem",marginBottom:"1.5rem"},
+  navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
+  reviewCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"1rem"},
+  stars:{display:"flex",gap:"2px",marginBottom:"8px"},
+  star:{fontSize:"16px",color:"#C8F135"},
+  starEmpty:{fontSize:"16px",color:"#2A2A38"},
+}
+
+function MediaFeed({ posts, onDelete, isAdmin }) {
+  const [current, setCurrent] = useState(0)
+  if(posts.length===0) return (
+    <div style={{textAlign:"center",padding:"3rem",color:"#9090A8"}}>
+      <div style={{fontSize:"40px",marginBottom:"1rem"}}>📱</div>
+      <p>No posts yet — check back soon!</p>
+    </div>
+  )
+  const post = posts[current]
+  return (
+    <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1rem"}}>
+      <div style={{width:"100%",maxWidth:"400px",background:"#16161F",borderRadius:"16px",overflow:"hidden",border:"1px solid #2A2A38",position:"relative"}}>
+        {post.type==="video"?(
+          <video src={post.url} controls autoPlay muted loop style={{width:"100%",maxHeight:"600px",objectFit:"cover",display:"block"}} />
+        ):(
+          <img src={post.url} alt={post.caption} style={{width:"100%",maxHeight:"600px",objectFit:"cover",display:"block"}} />
+        )}
+        <div style={{padding:"1rem"}}>
+          <div style={{fontWeight:"600",marginBottom:"4px"}}>{post.caption}</div>
+          <div style={{fontSize:"12px",color:"#9090A8"}}>{post.business_name||post.businessName} · {post.date}</div>
+        </div>
+        {isAdmin&&(
+          <button style={{position:"absolute",top:"10px",right:"10px",...s.btn,...s.btnDanger,fontSize:"11px",padding:"4px 10px"}} onClick={()=>onDelete(post.id)}>Remove</button>
+        )}
+      </div>
+      <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setCurrent(c=>Math.max(0,c-1))} disabled={current===0}>← Prev</button>
+        <span style={{fontSize:"12px",color:"#9090A8"}}>{current+1} / {posts.length}</span>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setCurrent(c=>Math.min(posts.length-1,c+1))} disabled={current===posts.length-1}>Next →</button>
+      </div>
+    </div>
+  )
+}
+
+function AdminLogin({ onLogin }) {
+  const [pw, setPw] = useState("")
+  const [error, setError] = useState(false)
+  const handle = () => {
+    if(pw==="foundrsg2026"){onLogin()}
+    else{setError(true);setTimeout(()=>setError(false),2000)}
+  }
+  return (
+    <div style={{...s.page,...s.center}}>
+      <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem",width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <div style={{fontSize:"32px",marginBottom:"1rem"}}>⚡</div>
+        <h2 style={{fontWeight:"800",marginBottom:"6px"}}>Admin Access</h2>
+        <p style={{color:"#9090A8",fontSize:"13px",marginBottom:"1.5rem"}}>LIVO — restricted area</p>
+        <input style={{...s.input,textAlign:"center",letterSpacing:"0.1em",borderColor:error?"#FF4D6A":"#2A2A38"}} type="password" placeholder="Enter password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} />
+        {error&&<p style={{color:"#FF4D6A",fontSize:"12px",marginTop:"-0.75rem",marginBottom:"1rem"}}>Incorrect password</p>}
+        <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={handle}>Enter →</button>
+      </div>
+    </div>
+  )
+}
+
+export default function Admin() {
+  const [view, setView] = useState("home")
+  const [bizList] = useState(businesses)
+  const [applications, setApplications] = useState([
+    { id:1, bizName:"Boba Theory", founder:"Ryan Ong", uni:"SUTD", category:"Food & Drinks", email:"ryan@student.sutd.edu.sg", status:"pending", date:"2 May 2026" },
+    { id:2, bizName:"CoachBot SG", founder:"Wei Jie Tan", uni:"NUS", category:"Services", email:"weijie@u.nus.edu", status:"pending", date:"1 May 2026" },
+  ])
+  const [toast, setToast] = useState(null)
+  const [adminUnlocked, setAdminUnlocked] = useState(false)
+  const [posts, setPosts] = useState([])
+  const [uploading, setUploading] = useState(false)
+  const [newPost, setNewPost] = useState({caption:"",businessName:""})
+  const [reviews, setReviews] = useState([])
+  const [loading, setLoading] = useState(true)
+  const fileRef = useRef()
+
+  useEffect(()=>{ loadAll() },[])
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      const [postsRes, reviewsRes] = await Promise.all([
+        supabase.from("posts").select("*").order("created_at",{ascending:false}),
+        supabase.from("reviews").select("*").order("created_at",{ascending:false}),
+      ])
+      if(postsRes.data) setPosts(postsRes.data)
+      if(reviewsRes.data) setReviews(reviewsRes.data)
+    } catch(err){ console.error(err) }
+    setLoading(false)
+  }
+
+  const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
+
+  const approve = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"approved"}:x)); showToast("✓ Application approved!") }
+  const reject = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"rejected"}:x)); showToast("✗ Application rejected") }
+
+  const uploadMedia = async (e) => {
+    const file = e.target.files[0]
+    if(!file) return
+    if(!newPost.caption||!newPost.businessName){showToast("⚠️ Fill in caption and business name first");fileRef.current.value="";return}
+    setUploading(true)
+    try {
+      const ext = file.name.split(".").pop()
+      const filename = `${Date.now()}.${ext}`
+      const { error:uploadError } = await supabase.storage.from("Media").upload(filename,file,{upsert:true})
+      if(uploadError) throw uploadError
+      const { data:urlData } = supabase.storage.from("Media").getPublicUrl(filename)
+      const isVideo = file.type.startsWith("video")
+      const post = { caption:newPost.caption, business_name:newPost.businessName, url:urlData.publicUrl, type:isVideo?"video":"image", date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
+      const { data, error } = await supabase.from("posts").insert([post]).select()
+      if(error) throw error
+      setPosts(prev=>[data[0],...prev])
+      setNewPost({caption:"",businessName:""})
+      fileRef.current.value=""
+      showToast("✓ Post uploaded!")
+    } catch(err){
+      showToast("❌ Upload failed: "+err.message)
+      console.error("Full error:",err)
+    }
+    setUploading(false)
+  }
+
+  const deletePost = async (id) => {
+    await supabase.from("posts").delete().eq("id",id)
+    setPosts(prev=>prev.filter(p=>p.id!==id))
+    showToast("🗑️ Post removed")
+  }
+
+  if(!adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
+  if(loading) return <div style={{...s.page,...s.center}}><p style={{color:"#9090A8"}}>Loading...</p></div>
+
+  return (
+    <div style={s.page}>
+      {toast&&<div style={{position:"fixed",bottom:"1.5rem",right:"1.5rem",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"12px 16px",fontSize:"13px",zIndex:999,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>{toast}</div>}
+      <div style={s.topbar}>
+        <div style={{fontWeight:"800",fontSize:"18px"}}>LI<span style={s.accent}>VO</span> <span style={{fontSize:"11px",color:"#FF4D6A",background:"rgba(255,77,106,0.15)",padding:"2px 8px",borderRadius:"10px",fontWeight:"700"}}>ADMIN</span></div>
+        <div style={{display:"flex",gap:"4px"}}>
+          <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Overview</button>
+          <button style={{...s.navBtn,...(view==="upload"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("upload")}>Upload Media</button>
+          <button style={{...s.navBtn,...(view==="applications"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("applications")}>Applications</button>
+          <button style={{...s.navBtn,...(view==="businesses"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("businesses")}>Businesses</button>
+        </div>
+        <button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>setAdminUnlocked(false)}>Lock 🔒</button>
+      </div>
+      <div style={s.main}>
+        {view==="home"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
+            <div style={s.statsGrid}>
+              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Reviews",reviews.length,"Total"]].map(([l,v,sub])=>(
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+              ))}
+            </div>
+            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem",paddingBottom:"6px",borderBottom:"1px solid #2A2A38"}}>Pending Applications</div>
+            {applications.filter(a=>a.status==="pending").map(a=>(
+              <div key={a.id} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
+                <div><div style={{fontWeight:"600"}}>{a.bizName}</div><div style={{fontSize:"12px",color:"#9090A8"}}>{a.founder} · {a.uni} · {a.date}</div></div>
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button style={{...s.btn,...s.btnSuccess,fontSize:"12px"}} onClick={()=>approve(a.id)}>Approve</button>
+                  <button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>reject(a.id)}>Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {view==="upload"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2></div>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem"}}>
+              <input style={s.input} placeholder="Business name" value={newPost.businessName} onChange={e=>setNewPost(p=>({...p,businessName:e.target.value}))} />
+              <input style={s.input} placeholder="Caption" value={newPost.caption} onChange={e=>setNewPost(p=>({...p,caption:e.target.value}))} />
+              <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={uploadMedia} />
+              <button style={{...s.btn,...s.btnAccent,width:"100%",padding:"12px"}} onClick={()=>fileRef.current.click()} disabled={uploading}>
+                {uploading?"Uploading...":"📁 Choose Image or Video"}
+              </button>
+            </div>
+            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Posted ({posts.length})</div>
+            <MediaFeed posts={posts} isAdmin={true} onDelete={deletePost} />
+          </div>
+        )}
+        {view==="applications"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>All Applications</h2></div>
+            {applications.map(a=>(
+              <div key={a.id} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
+                <div>
+                  <div style={{fontWeight:"600"}}>{a.bizName}</div>
+                  <div style={{fontSize:"12px",color:"#9090A8"}}>{a.founder} · {a.uni} · {a.email}</div>
+                </div>
+                <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                  <span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"20px",background:a.status==="approved"?"rgba(34,197,94,0.15)":a.status==="rejected"?"rgba(255,77,106,0.15)":"rgba(249,115,22,0.15)",color:a.status==="approved"?"#22C55E":a.status==="rejected"?"#FF4D6A":"#F97316",fontWeight:"600"}}>{a.status}</span>
+                  {a.status==="pending"&&<><button style={{...s.btn,...s.btnSuccess,fontSize:"12px"}} onClick={()=>approve(a.id)}>Approve</button><button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>reject(a.id)}>Reject</button></>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        {view==="businesses"&&(
+          <div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>All Businesses</h2></div>
+            <div style={s.grid}>
+              {bizList.map(b=>(
+                <div key={b.id} style={s.card}>
+                  <div style={s.cardImg}>{b.emoji}</div>
+                  <div style={s.cardBody}>
+                    <div style={{fontWeight:"600",marginBottom:"4px"}}>{b.name}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{b.desc}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={s.tag}>{b.uni}</span>
+                      <span style={{fontSize:"11px",padding:"3px 8px",borderRadius:"20px",background:b.status==="approved"?"rgba(34,197,94,0.15)":"rgba(249,115,22,0.15)",color:b.status==="approved"?"#22C55E":"#F97316",fontWeight:"600"}}>{b.status}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

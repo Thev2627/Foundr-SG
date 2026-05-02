@@ -287,24 +287,25 @@ export default function App() {
 
   if(portal==="admin"&&!adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
 
-  if(!portal) return (
-    <div style={{...s.page,...s.center}}>
-      <div style={s.logo}>Foundr<span style={s.accent}>SG</span></div>
-      <div style={s.sub}>Singapore's student business marketplace</div>
-      <div style={s.cards}>
-        {[["🛍️","Consumer","Shop from student businesses","#C8F135"],["🚀","Founder","Manage your student store","#A78BFA"]].map(([icon,label,desc,color])=>(
-          <div key={label} onClick={()=>enterPortal(label.toLowerCase())} style={s.portalCard}>
-            <div style={{fontSize:"36px",marginBottom:"1rem"}}>{icon}</div>
-            <div style={{fontWeight:"700",marginBottom:"6px"}}>{label}</div>
-            <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"12px"}}>{desc}</div>
-            <div style={{fontSize:"11px",padding:"3px 10px",borderRadius:"20px",background:`${color}22`,color,display:"inline-block",fontWeight:"600"}}>{label}</div>
-          </div>
-        ))}
-      </div>
-      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem",cursor:"pointer",padding:"4px 8px",borderRadius:"4px",border:"1px solid transparent"}} onClick={()=>setPortal("admin")} onMouseEnter={(e)=>e.target.style.borderColor="#C8F135"} onMouseLeave={(e)=>e.target.style.borderColor="transparent"}>v1.0 ⚡ Admin</p>
+   if(!portal) return (
+  <div style={{...s.page,...s.center}}>
+    <div style={{position:"absolute",top:"1rem",left:"1.5rem"}}>
+      <button onClick={()=>enterPortal("founder")} style={{background:"transparent",border:"1px solid #2A2A38",borderRadius:"8px",padding:"6px 14px",color:"#F0F0F5",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
+        Business Owner →
+      </button>
     </div>
-  )
-
+    <div style={s.logo}>LI<span style={s.accent}>VO</span></div>
+    <div style={s.sub}>Singapore's student business marketplace</div>
+    <div style={s.cards}>
+      <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
+        <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
+        <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"6px"}}>Shop Now</div>
+        <div style={{fontSize:"13px",color:"#9090A8",marginBottom:"16px"}}>Discover & buy from student businesses</div>
+        <div style={{...s.btn,...s.btnAccent,display:"inline-block"}}>Enter →</div>
+      </div>
+    </div>
+  </div>
+)
   if(loading) return (
     <div style={{...s.page,...s.center}}>
       <div style={{fontSize:"32px",marginBottom:"1rem"}}>⏳</div>
