@@ -28,7 +28,6 @@ const defaultProducts = [
 const s = {
   page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
   center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
-  logo:{fontSize:"32px",fontWeight:"800",marginBottom:"8px"},
   accent:{color:"#F97316"},
   sub:{color:"#9090A8",fontSize:"14px",marginBottom:"2.5rem"},
   cards:{display:"flex",gap:"1rem",flexWrap:"wrap",justifyContent:"center"},
@@ -261,21 +260,26 @@ export default function App() {
 
   // LANDING PAGE
   if(!portal) return (
-    <div style={{...s.page,...s.center}}>
-      <div style={{position:"absolute",top:"1rem",left:"1.5rem"}}>
+    <div style={{...s.page,...s.center,position:"relative",overflow:"hidden"}}>
+      {/* Translucent lion watermark - smaller */}
+      <img src="/logo.png" alt="" style={{position:"absolute",width:"300px",height:"300px",objectFit:"contain",opacity:0.07,pointerEvents:"none",zIndex:0,userSelect:"none"}} onError={e=>e.target.style.display="none"} />
+      {/* Business Owner button top left */}
+      <div style={{position:"absolute",top:"1rem",left:"1.5rem",zIndex:1}}>
         <button onClick={()=>enterPortal("founder")} style={{background:"transparent",border:"1px solid #2A2A38",borderRadius:"8px",padding:"6px 14px",color:"#F0F0F5",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
           Business Owner →
         </button>
       </div>
-      <img src="/logo.png" alt="Leo" style={{width:"350px",height:"350px",objectFit:"contain",marginBottom:"-30px",mixBlendMode:"lighten"}} onError={e=>e.target.style.display="none"} />
-      <div style={{fontSize:"128px",fontWeight:"400",fontFamily:"'Pacifico',cursive",color:"#E8821A",marginBottom:"4px",marginTop:"-20px"}}>Leo</div>
-      <div style={s.sub}>Singapore's student marketplace</div>
-      <div style={s.cards}>
-        <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
-          <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
-          <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"6px"}}>Shop Now</div>
-          <div style={{fontSize:"13px",color:"#9090A8",marginBottom:"16px"}}>Discover & buy from student businesses</div>
-          <div style={{...s.btn,...s.btnAccent,display:"inline-block"}}>Enter →</div>
+      {/* Main content */}
+      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+        <div style={{fontSize:"96px",fontWeight:"400",fontFamily:"'Pacifico',cursive",color:"#E8821A",lineHeight:1.1,marginBottom:"4px"}}>Leo</div>
+        <div style={s.sub}>Singapore's student marketplace</div>
+        <div style={s.cards}>
+          <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
+            <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
+            <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"6px"}}>Shop Now</div>
+            <div style={{fontSize:"13px",color:"#9090A8",marginBottom:"16px"}}>Discover & buy from student businesses</div>
+            <div style={{...s.btn,...s.btnAccent,display:"inline-block"}}>Enter →</div>
+          </div>
         </div>
       </div>
     </div>
@@ -293,8 +297,7 @@ export default function App() {
       {toast&&<div style={{position:"fixed",bottom:"1.5rem",right:"1.5rem",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"12px 16px",fontSize:"13px",zIndex:999,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>{toast}</div>}
 
       <div style={s.topbar}>
-        <div style={{fontWeight:"800",fontSize:"18px",display:"flex",alignItems:"center",gap:"8px"}}>
-          <img src="/logo.png" alt="Leo" style={{width:"28px",height:"28px",objectFit:"contain"}} onError={e=>e.target.style.display="none"} />
+        <div style={{fontWeight:"400",fontSize:"22px",fontFamily:"'Pacifico',cursive",color:"#E8821A",display:"flex",alignItems:"center",gap:"8px"}}>
           🦁 Leo
         </div>
         <div style={{display:"flex",gap:"4px"}}>
