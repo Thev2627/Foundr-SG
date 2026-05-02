@@ -267,8 +267,8 @@ export default function App() {
           Business Owner →
         </button>
       </div>
-      <img src="/logo.png" alt="Leo" style={{width:"100px",height:"100px",objectFit:"contain",marginBottom:"12px"}} onError={e=>e.target.style.display="none"} />
-      <div style={s.logo}>Leo</div>
+      <img src="/logo.png" alt="Leo" style={{width:"350px",height:"350px",objectFit:"contain",marginBottom:"-30px",mixBlendMode:"lighten"}} onError={e=>e.target.style.display="none"} />
+      <div style={{fontSize:"128px",fontWeight:"400",fontFamily:"'Pacifico',cursive",color:"#E8821A",marginBottom:"4px",marginTop:"-20px"}}>Leo</div>
       <div style={s.sub}>Singapore's student marketplace</div>
       <div style={s.cards}>
         <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
