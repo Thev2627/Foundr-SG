@@ -29,7 +29,7 @@ const s = {
   page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
   center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
   logo:{fontSize:"32px",fontWeight:"800",marginBottom:"8px"},
-  accent:{color:"#F97316"},
+  accent:{color:"#C8F135"},
   sub:{color:"#9090A8",fontSize:"14px",marginBottom:"2.5rem"},
   cards:{display:"flex",gap:"1rem",flexWrap:"wrap",justifyContent:"center"},
   portalCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem 1.5rem",width:"200px",cursor:"pointer",textAlign:"center"},
@@ -41,7 +41,7 @@ const s = {
   cardBody:{padding:"1rem"},
   tag:{fontSize:"10px",padding:"3px 8px",background:"#1A1A24",borderRadius:"20px",color:"#9090A8"},
   btn:{padding:"8px 16px",borderRadius:"8px",border:"none",cursor:"pointer",fontWeight:"600",fontSize:"13px",fontFamily:"inherit"},
-  btnAccent:{background:"#F97316",color:"#0A0A0F"},
+  btnAccent:{background:"#C8F135",color:"#0A0A0F"},
   btnOutline:{background:"transparent",border:"1px solid #2A2A38",color:"#9090A8"},
   btnDanger:{background:"rgba(255,77,106,0.15)",border:"1px solid rgba(255,77,106,0.2)",color:"#FF4D6A"},
   btnSuccess:{background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.2)",color:"#22C55E"},
@@ -51,7 +51,7 @@ const s = {
   navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
   reviewCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"1rem"},
   stars:{display:"flex",gap:"2px",marginBottom:"8px"},
-  star:{fontSize:"16px",color:"#F97316"},
+  star:{fontSize:"16px",color:"#C8F135"},
   starEmpty:{fontSize:"16px",color:"#2A2A38"},
 }
 
@@ -102,7 +102,7 @@ function ReviewSummary({ type, targetId, reviews }) {
           <span key={i} style={i<Math.floor(avg)?s.star:s.starEmpty}>★</span>
         ))}
       </div>
-      <span style={{fontSize:"14px",color:"#F97316",fontWeight:"600"}}>{avg}</span>
+      <span style={{fontSize:"14px",color:"#C8F135",fontWeight:"600"}}>{avg}</span>
       <span style={{fontSize:"12px",color:"#9090A8"}}>({targetReviews.length} reviews)</span>
     </div>
   )
@@ -146,7 +146,7 @@ function AdminLogin({ onLogin }) {
   const [pw, setPw] = useState("")
   const [error, setError] = useState(false)
   const handle = () => {
-    if(pw==="Leo"){onLogin()}
+    if(pw==="foundrsg2026"){onLogin()}
     else{setError(true);setTimeout(()=>setError(false),2000)}
   }
   return (
@@ -295,7 +295,7 @@ export default function App() {
       </button>
     </div>
     <div style={s.logo}>LI<span style={s.accent}>VO</span></div>
-    <div style={s.sub}>Singapore's student marketplace</div>
+    <div style={s.sub}>Singapore's student business marketplace</div>
     <div style={s.cards}>
       <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
         <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
@@ -318,13 +318,13 @@ export default function App() {
       {toast&&<div style={{position:"fixed",bottom:"1.5rem",right:"1.5rem",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"12px 16px",fontSize:"13px",zIndex:999,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>{toast}</div>}
 
       <div style={s.topbar}>
-        <div style={{fontWeight:"800",fontSize:"18px"}}>🦁 Leo</div>
+        <div style={{fontWeight:"800",fontSize:"18px"}}>Foundr<span style={s.accent}>SG</span></div>
         <div style={{display:"flex",gap:"4px"}}>
           {portal==="consumer"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Discover</button>
             <button style={{...s.navBtn,...(view==="shop"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("shop")}>Shop</button>
             <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
-            <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#F97316",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
+            <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#C8F135",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
           </>}
           {portal==="founder"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Dashboard</button>
@@ -367,7 +367,7 @@ export default function App() {
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{b.desc}</div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span style={s.tag}>{b.uni}</span>
-                      <span style={{fontSize:"10px",color:"#F97316",fontWeight:"600"}}>✓ Verified</span>
+                      <span style={{fontSize:"10px",color:"#C8F135",fontWeight:"600"}}>✓ Verified</span>
                     </div>
                   </div>
                 </div>
@@ -383,7 +383,7 @@ export default function App() {
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem",display:"flex",gap:"1rem",alignItems:"center"}}>
               <div style={{fontSize:"40px",width:"64px",height:"64px",background:"#1A1A24",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{selectedBiz.emoji}</div>
               <div>
-                <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"2px"}}>{selectedBiz.name} <span style={{color:"#F97316",fontSize:"13px"}}>✓</span></div>
+                <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"2px"}}>{selectedBiz.name} <span style={{color:"#C8F135",fontSize:"13px"}}>✓</span></div>
                 <div style={{color:"#9090A8",fontSize:"13px"}}>{selectedBiz.category} · {selectedBiz.uni} · by {selectedBiz.founder}</div>
                 <div style={{color:"#9090A8",fontSize:"13px",marginTop:"6px"}}>{selectedBiz.desc}</div>
               </div>
@@ -396,7 +396,7 @@ export default function App() {
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
-                    <div style={{fontSize:"18px",fontWeight:"800",color:"#F97316",marginBottom:"8px"}}>${p.price}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
                     <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={e=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
@@ -418,7 +418,7 @@ export default function App() {
               <div style={{flex:1,minWidth:"250px"}}>
                 <div style={{fontWeight:"700",fontSize:"24px",marginBottom:"8px"}}>{selectedProduct.name}</div>
                 <div style={{fontSize:"16px",color:"#9090A8",marginBottom:"1rem"}}>{selectedProduct.desc||selectedProduct.description}</div>
-                <div style={{fontSize:"32px",fontWeight:"800",color:"#F97316",marginBottom:"1rem"}}>${selectedProduct.price}</div>
+                <div style={{fontSize:"32px",fontWeight:"800",color:"#C8F135",marginBottom:"1rem"}}>${selectedProduct.price}</div>
                 <button style={{...s.btn,...s.btnAccent,padding:"12px 24px",fontSize:"16px"}} onClick={()=>addToCart(selectedProduct)}>Add to Cart</button>
               </div>
             </div>
@@ -441,7 +441,7 @@ export default function App() {
                     <div style={{fontWeight:"600",marginBottom:"2px"}}>{p.name}</div>
                     <div style={{fontSize:"11px",color:"#9090A8",marginBottom:"6px"}}>by {b?.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
-                    <div style={{fontSize:"18px",fontWeight:"800",color:"#F97316",marginBottom:"8px"}}>${p.price}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
                     <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={e=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
@@ -460,11 +460,11 @@ export default function App() {
                 <div key={c.id} style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 0",borderBottom:"1px solid #2A2A38"}}>
                   <div style={{fontSize:"28px",width:"44px",height:"44px",background:"#1A1A24",borderRadius:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>{c.emoji}</div>
                   <div style={{flex:1}}><div style={{fontWeight:"600",fontSize:"13px"}}>{c.name}</div><div style={{fontSize:"12px",color:"#9090A8"}}>Qty: {c.qty}</div></div>
-                  <div style={{fontWeight:"700",color:"#F97316"}}>${c.price*c.qty}</div>
+                  <div style={{fontWeight:"700",color:"#C8F135"}}>${c.price*c.qty}</div>
                 </div>
               ))}
               <div style={{marginTop:"1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{fontSize:"12px",color:"#9090A8"}}>Total</div><div style={{fontSize:"24px",fontWeight:"800",color:"#F97316"}}>${cartTotal}</div></div>
+                <div><div style={{fontSize:"12px",color:"#9090A8"}}>Total</div><div style={{fontSize:"24px",fontWeight:"800",color:"#C8F135"}}>${cartTotal}</div></div>
                 <button style={{...s.btn,...s.btnAccent}} onClick={()=>{setCart([]);showToast("🎉 Order placed!")}}>Checkout →</button>
               </div>
             </div>}
@@ -480,7 +480,7 @@ export default function App() {
             </div>
             <div style={s.statsGrid}>
               {[["Products",founderProducts.length,"Listed"],["Reviews",getBizReviews(founderBiz.id).length,"Received"],["Views","142","This week"],["Orders","3","All time"]].map(([l,v,sub])=>(
-                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#F97316"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
           </div>
@@ -504,7 +504,7 @@ export default function App() {
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
-                    <div style={{fontSize:"18px",fontWeight:"800",color:"#F97316",marginBottom:"8px"}}>${p.price}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
                     <button style={{...s.btn,...s.btnDanger,width:"100%",fontSize:"12px"}} onClick={()=>deleteProduct(p.id)}>Remove</button>
                   </div>
                 </div>
@@ -519,7 +519,7 @@ export default function App() {
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
             <div style={s.statsGrid}>
               {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Reviews",reviews.length,"Total"]].map(([l,v,sub])=>(
-                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#F97316"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
             <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem",paddingBottom:"6px",borderBottom:"1px solid #2A2A38"}}>Pending Applications</div>
@@ -539,8 +539,8 @@ export default function App() {
           <div>
             <div style={{marginBottom:"1.5rem"}}>
               <h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2>
-              <div style={{fontSize:"12px",color:"#F97316",fontWeight:"600",display:"flex",alignItems:"center",gap:"6px"}}>
-                <span style={{fontSize:"10px",padding:"2px 6px",background:"#F97316",color:"#0A0A0F",borderRadius:"10px",fontWeight:"800"}}>ADMIN ONLY</span>
+              <div style={{fontSize:"12px",color:"#C8F135",fontWeight:"600",display:"flex",alignItems:"center",gap:"6px"}}>
+                <span style={{fontSize:"10px",padding:"2px 6px",background:"#C8F135",color:"#0A0A0F",borderRadius:"10px",fontWeight:"800"}}>ADMIN ONLY</span>
                 Restricted Media upload for verified content
               </div>
             </div>

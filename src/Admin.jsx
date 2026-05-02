@@ -17,9 +17,9 @@ const businesses = [
 const s = {
   page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
   center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
-  accent:{color:"#F97316"},
+  accent:{color:"#C8F135"},
   btn:{padding:"8px 16px",borderRadius:"8px",border:"none",cursor:"pointer",fontWeight:"600",fontSize:"13px",fontFamily:"inherit"},
-  btnAccent:{background:"#F97316",color:"#0A0A0F"},
+  btnAccent:{background:"#C8F135",color:"#0A0A0F"},
   btnOutline:{background:"transparent",border:"1px solid #2A2A38",color:"#9090A8"},
   btnDanger:{background:"rgba(255,77,106,0.15)",border:"1px solid rgba(255,77,106,0.2)",color:"#FF4D6A"},
   btnSuccess:{background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.2)",color:"#22C55E"},
@@ -36,7 +36,7 @@ const s = {
   navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
   reviewCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"1rem"},
   stars:{display:"flex",gap:"2px",marginBottom:"8px"},
-  star:{fontSize:"16px",color:"#F97316"},
+  star:{fontSize:"16px",color:"#C8F135"},
   starEmpty:{fontSize:"16px",color:"#2A2A38"},
 }
 
@@ -86,7 +86,7 @@ function AdminLogin({ onLogin }) {
       <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem",width:"100%",maxWidth:"360px",textAlign:"center"}}>
         <div style={{fontSize:"32px",marginBottom:"1rem"}}>⚡</div>
         <h2 style={{fontWeight:"800",marginBottom:"6px"}}>Admin Access</h2>
-        <p style={{color:"#9090A8",fontSize:"13px",marginBottom:"1.5rem"}}>Leo — restricted area</p>
+        <p style={{color:"#9090A8",fontSize:"13px",marginBottom:"1.5rem"}}>LIVO — restricted area</p>
         <input style={{...s.input,textAlign:"center",letterSpacing:"0.1em",borderColor:error?"#FF4D6A":"#2A2A38"}} type="password" placeholder="Enter password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} />
         {error&&<p style={{color:"#FF4D6A",fontSize:"12px",marginTop:"-0.75rem",marginBottom:"1rem"}}>Incorrect password</p>}
         <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={handle}>Enter →</button>
@@ -170,7 +170,7 @@ export default function Admin() {
     <div style={s.page}>
       {toast&&<div style={{position:"fixed",bottom:"1.5rem",right:"1.5rem",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"12px 16px",fontSize:"13px",zIndex:999,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>{toast}</div>}
       <div style={s.topbar}>
-        <div style={{fontWeight:"800",fontSize:"18px"}}>🦁 Leo <span style={{fontSize:"11px",color:"#FF4D6A",background:"rgba(255,77,106,0.15)",padding:"2px 8px",borderRadius:"10px",fontWeight:"700"}}>ADMIN</span></div>
+        <div style={{fontWeight:"800",fontSize:"18px"}}>LI<span style={s.accent}>VO</span> <span style={{fontSize:"11px",color:"#FF4D6A",background:"rgba(255,77,106,0.15)",padding:"2px 8px",borderRadius:"10px",fontWeight:"700"}}>ADMIN</span></div>
         <div style={{display:"flex",gap:"4px"}}>
           <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Overview</button>
           <button style={{...s.navBtn,...(view==="upload"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("upload")}>Upload Media</button>
@@ -185,7 +185,7 @@ export default function Admin() {
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
             <div style={s.statsGrid}>
               {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Reviews",reviews.length,"Total"]].map(([l,v,sub])=>(
-                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#F97316"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
             <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem",paddingBottom:"6px",borderBottom:"1px solid #2A2A38"}}>Pending Applications</div>
