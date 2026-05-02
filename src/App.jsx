@@ -29,7 +29,7 @@ const s = {
   page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
   center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
   logo:{fontSize:"32px",fontWeight:"800",marginBottom:"8px"},
-  accent:{color:"#C8F135"},
+  accent:{color:"#F97316"},
   sub:{color:"#9090A8",fontSize:"14px",marginBottom:"2.5rem"},
   cards:{display:"flex",gap:"1rem",flexWrap:"wrap",justifyContent:"center"},
   portalCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem 1.5rem",width:"200px",cursor:"pointer",textAlign:"center"},
@@ -41,7 +41,7 @@ const s = {
   cardBody:{padding:"1rem"},
   tag:{fontSize:"10px",padding:"3px 8px",background:"#1A1A24",borderRadius:"20px",color:"#9090A8"},
   btn:{padding:"8px 16px",borderRadius:"8px",border:"none",cursor:"pointer",fontWeight:"600",fontSize:"13px",fontFamily:"inherit"},
-  btnAccent:{background:"#C8F135",color:"#0A0A0F"},
+  btnAccent:{background:"#F97316",color:"#0A0A0F"},
   btnOutline:{background:"transparent",border:"1px solid #2A2A38",color:"#9090A8"},
   btnDanger:{background:"rgba(255,77,106,0.15)",border:"1px solid rgba(255,77,106,0.2)",color:"#FF4D6A"},
   btnSuccess:{background:"rgba(34,197,94,0.15)",border:"1px solid rgba(34,197,94,0.2)",color:"#22C55E"},
@@ -51,7 +51,7 @@ const s = {
   navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
   reviewCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"1rem"},
   stars:{display:"flex",gap:"2px",marginBottom:"8px"},
-  star:{fontSize:"16px",color:"#C8F135"},
+  star:{fontSize:"16px",color:"#F97316"},
   starEmpty:{fontSize:"16px",color:"#2A2A38"},
 }
 
@@ -102,7 +102,7 @@ function ReviewSummary({ type, targetId, reviews }) {
           <span key={i} style={i<Math.floor(avg)?s.star:s.starEmpty}>★</span>
         ))}
       </div>
-      <span style={{fontSize:"14px",color:"#C8F135",fontWeight:"600"}}>{avg}</span>
+      <span style={{fontSize:"14px",color:"#F97316",fontWeight:"600"}}>{avg}</span>
       <span style={{fontSize:"12px",color:"#9090A8"}}>({targetReviews.length} reviews)</span>
     </div>
   )
@@ -142,27 +142,6 @@ function MediaFeed({ posts, onDelete, isAdmin }) {
   )
 }
 
-function AdminLogin({ onLogin }) {
-  const [pw, setPw] = useState("")
-  const [error, setError] = useState(false)
-  const handle = () => {
-    if(pw==="foundrsg2026"){onLogin()}
-    else{setError(true);setTimeout(()=>setError(false),2000)}
-  }
-  return (
-    <div style={{...s.page,...s.center}}>
-      <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"16px",padding:"2rem",width:"100%",maxWidth:"360px",textAlign:"center"}}>
-        <div style={{fontSize:"32px",marginBottom:"1rem"}}>⚡</div>
-        <h2 style={{fontWeight:"800",marginBottom:"6px"}}>Admin Access</h2>
-        <p style={{color:"#9090A8",fontSize:"13px",marginBottom:"1.5rem"}}>Foundr SG — restricted area</p>
-        <input style={{...s.input,textAlign:"center",letterSpacing:"0.1em",borderColor:error?"#FF4D6A":"#2A2A38"}} type="password" placeholder="Enter password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handle()} />
-        {error&&<p style={{color:"#FF4D6A",fontSize:"12px",marginTop:"-0.75rem",marginBottom:"1rem"}}>Incorrect password</p>}
-        <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={handle}>Enter →</button>
-      </div>
-    </div>
-  )
-}
-
 export default function App() {
   const [portal, setPortal] = useState(null)
   const [view, setView] = useState("home")
@@ -178,7 +157,6 @@ export default function App() {
   const [newProduct, setNewProduct] = useState({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
   const [toast, setToast] = useState(null)
   const [activeFilter, setActiveFilter] = useState("All")
-  const [adminUnlocked, setAdminUnlocked] = useState(false)
   const [posts, setPosts] = useState([])
   const [uploading, setUploading] = useState(false)
   const [newPost, setNewPost] = useState({caption:"",businessName:""})
@@ -187,7 +165,6 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const fileRef = useRef()
 
-  // Load all data from Supabase on startup
   useEffect(()=>{ loadAll() },[])
 
   const loadAll = async () => {
@@ -237,34 +214,31 @@ export default function App() {
     showToast("🗑️ Product removed")
   }
 
- const uploadMedia = async (e) => {
-  const file = e.target.files[0]
-  if(!file) return
-  if(!newPost.caption||!newPost.businessName){showToast("⚠️ Fill in caption and business name first");fileRef.current.value="";return}
-  setUploading(true)
-  try {
-    const ext = file.name.split(".").pop()
-    const filename = `${Date.now()}.${ext}`
-    console.log("Uploading to bucket: Media, filename:", filename)
-    const { data:uploadData, error:uploadError } = await supabase.storage.from("Media").upload(filename,file,{upsert:true})
-    console.log("Upload result:", uploadData, uploadError)
-    if(uploadError) throw uploadError
-    const { data:urlData } = supabase.storage.from("Media").getPublicUrl(filename)
-    console.log("Public URL:", urlData.publicUrl)
-    const isVideo = file.type.startsWith("video")
-    const post = { caption:newPost.caption, business_name:newPost.businessName, url:urlData.publicUrl, type:isVideo?"video":"image", date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
-    const { data, error } = await supabase.from("posts").insert([post]).select()
-    if(error) throw error
-    setPosts(prev=>[data[0],...prev])
-    setNewPost({caption:"",businessName:""})
-    fileRef.current.value=""
-    showToast("✓ Post uploaded!")
-  } catch(err){ 
-    showToast("❌ Upload failed: " + err.message)
-    console.error("Full error:", err) 
+  const uploadMedia = async (e) => {
+    const file = e.target.files[0]
+    if(!file) return
+    if(!newPost.caption||!newPost.businessName){showToast("⚠️ Fill in caption and business name first");fileRef.current.value="";return}
+    setUploading(true)
+    try {
+      const ext = file.name.split(".").pop()
+      const filename = `${Date.now()}.${ext}`
+      const { error:uploadError } = await supabase.storage.from("Media").upload(filename,file,{upsert:true})
+      if(uploadError) throw uploadError
+      const { data:urlData } = supabase.storage.from("Media").getPublicUrl(filename)
+      const isVideo = file.type.startsWith("video")
+      const post = { caption:newPost.caption, business_name:newPost.businessName, url:urlData.publicUrl, type:isVideo?"video":"image", date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
+      const { data, error } = await supabase.from("posts").insert([post]).select()
+      if(error) throw error
+      setPosts(prev=>[data[0],...prev])
+      setNewPost({caption:"",businessName:""})
+      fileRef.current.value=""
+      showToast("✓ Post uploaded!")
+    } catch(err){
+      showToast("❌ Upload failed: "+err.message)
+      console.error("Full error:",err)
+    }
+    setUploading(false)
   }
-  setUploading(false)
-}
 
   const deletePost = async (id) => {
     await supabase.from("posts").delete().eq("id",id)
@@ -285,31 +259,32 @@ export default function App() {
   const getBizReviews = (bizId) => reviews.filter(r=>r.type==="business"&&r.target_id===String(bizId))
   const getProductReviews = (productId) => reviews.filter(r=>r.type==="product"&&r.target_id===String(productId))
 
-  if(portal==="admin"&&!adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
-
-   if(!portal) return (
-  <div style={{...s.page,...s.center}}>
-    <div style={{position:"absolute",top:"1rem",left:"1.5rem"}}>
-      <button onClick={()=>enterPortal("founder")} style={{background:"transparent",border:"1px solid #2A2A38",borderRadius:"8px",padding:"6px 14px",color:"#F0F0F5",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
-        Business Owner →
-      </button>
-    </div>
-    <div style={s.logo}>LI<span style={s.accent}>VO</span></div>
-    <div style={s.sub}>Singapore's student business marketplace</div>
-    <div style={s.cards}>
-      <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
-        <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
-        <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"6px"}}>Shop Now</div>
-        <div style={{fontSize:"13px",color:"#9090A8",marginBottom:"16px"}}>Discover & buy from student businesses</div>
-        <div style={{...s.btn,...s.btnAccent,display:"inline-block"}}>Enter →</div>
+  // LANDING PAGE
+  if(!portal) return (
+    <div style={{...s.page,...s.center}}>
+      <div style={{position:"absolute",top:"1rem",left:"1.5rem"}}>
+        <button onClick={()=>enterPortal("founder")} style={{background:"transparent",border:"1px solid #2A2A38",borderRadius:"8px",padding:"6px 14px",color:"#F0F0F5",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
+          Business Owner →
+        </button>
+      </div>
+      <img src="/logo.png" alt="Leo" style={{width:"100px",height:"100px",objectFit:"contain",marginBottom:"12px"}} onError={e=>e.target.style.display="none"} />
+      <div style={s.logo}>Leo</div>
+      <div style={s.sub}>Singapore's student marketplace</div>
+      <div style={s.cards}>
+        <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
+          <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
+          <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"6px"}}>Shop Now</div>
+          <div style={{fontSize:"13px",color:"#9090A8",marginBottom:"16px"}}>Discover & buy from student businesses</div>
+          <div style={{...s.btn,...s.btnAccent,display:"inline-block"}}>Enter →</div>
+        </div>
       </div>
     </div>
-  </div>
-)
+  )
+
   if(loading) return (
     <div style={{...s.page,...s.center}}>
       <div style={{fontSize:"32px",marginBottom:"1rem"}}>⏳</div>
-      <p style={{color:"#9090A8"}}>Loading Foundr SG...</p>
+      <p style={{color:"#9090A8"}}>Loading Leo...</p>
     </div>
   )
 
@@ -318,27 +293,24 @@ export default function App() {
       {toast&&<div style={{position:"fixed",bottom:"1.5rem",right:"1.5rem",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"12px 16px",fontSize:"13px",zIndex:999,boxShadow:"0 8px 24px rgba(0,0,0,0.4)"}}>{toast}</div>}
 
       <div style={s.topbar}>
-        <div style={{fontWeight:"800",fontSize:"18px"}}>Foundr<span style={s.accent}>SG</span></div>
+        <div style={{fontWeight:"800",fontSize:"18px",display:"flex",alignItems:"center",gap:"8px"}}>
+          <img src="/logo.png" alt="Leo" style={{width:"28px",height:"28px",objectFit:"contain"}} onError={e=>e.target.style.display="none"} />
+          🦁 Leo
+        </div>
         <div style={{display:"flex",gap:"4px"}}>
           {portal==="consumer"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Discover</button>
             <button style={{...s.navBtn,...(view==="shop"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("shop")}>Shop</button>
             <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
-            <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#C8F135",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
+            <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#F97316",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
           </>}
           {portal==="founder"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Dashboard</button>
             <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
             <button style={{...s.navBtn,...(view==="products"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("products")}>Products</button>
           </>}
-          {portal==="admin"&&<>
-            <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Overview</button>
-            <button style={{...s.navBtn,...(view==="upload"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("upload")}>Upload Media</button>
-            <button style={{...s.navBtn,...(view==="applications"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("applications")}>Applications</button>
-            <button style={{...s.navBtn,...(view==="businesses"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("businesses")}>Businesses</button>
-          </>}
         </div>
-        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>{setPortal(null);setAdminUnlocked(false)}}>← Switch</button>
+        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setPortal(null)}>← Switch</button>
       </div>
 
       <div style={s.main}>
@@ -356,7 +328,7 @@ export default function App() {
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Discover Student Businesses 🔍</h2><p style={{color:"#9090A8",fontSize:"14px"}}>All verified student-run</p></div>
             <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"1.25rem"}}>
-              {categories.map(c=><button key={c} onClick={()=>setActiveFilter(c)} style={{...s.btn,padding:"5px 14px",fontSize:"12px",background:activeFilter===c?"#C8F135":"transparent",color:activeFilter===c?"#0A0A0F":"#9090A8",border:"1px solid "+(activeFilter===c?"#C8F135":"#2A2A38")}}>{c}</button>)}
+              {categories.map(c=><button key={c} onClick={()=>setActiveFilter(c)} style={{...s.btn,padding:"5px 14px",fontSize:"12px",background:activeFilter===c?"#F97316":"transparent",color:activeFilter===c?"#0A0A0F":"#9090A8",border:"1px solid "+(activeFilter===c?"#F97316":"#2A2A38")}}>{c}</button>)}
             </div>
             <div style={s.grid}>
               {filteredBiz.map(b=>(
@@ -367,7 +339,7 @@ export default function App() {
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{b.desc}</div>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                       <span style={s.tag}>{b.uni}</span>
-                      <span style={{fontSize:"10px",color:"#C8F135",fontWeight:"600"}}>✓ Verified</span>
+                      <span style={{fontSize:"10px",color:"#F97316",fontWeight:"600"}}>✓ Verified</span>
                     </div>
                   </div>
                 </div>
@@ -383,7 +355,7 @@ export default function App() {
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem",display:"flex",gap:"1rem",alignItems:"center"}}>
               <div style={{fontSize:"40px",width:"64px",height:"64px",background:"#1A1A24",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{selectedBiz.emoji}</div>
               <div>
-                <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"2px"}}>{selectedBiz.name} <span style={{color:"#C8F135",fontSize:"13px"}}>✓</span></div>
+                <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"2px"}}>{selectedBiz.name} <span style={{color:"#F97316",fontSize:"13px"}}>✓</span></div>
                 <div style={{color:"#9090A8",fontSize:"13px"}}>{selectedBiz.category} · {selectedBiz.uni} · by {selectedBiz.founder}</div>
                 <div style={{color:"#9090A8",fontSize:"13px",marginTop:"6px"}}>{selectedBiz.desc}</div>
               </div>
@@ -396,7 +368,7 @@ export default function App() {
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
-                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#F97316",marginBottom:"8px"}}>${p.price}</div>
                     <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={e=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
@@ -418,7 +390,7 @@ export default function App() {
               <div style={{flex:1,minWidth:"250px"}}>
                 <div style={{fontWeight:"700",fontSize:"24px",marginBottom:"8px"}}>{selectedProduct.name}</div>
                 <div style={{fontSize:"16px",color:"#9090A8",marginBottom:"1rem"}}>{selectedProduct.desc||selectedProduct.description}</div>
-                <div style={{fontSize:"32px",fontWeight:"800",color:"#C8F135",marginBottom:"1rem"}}>${selectedProduct.price}</div>
+                <div style={{fontSize:"32px",fontWeight:"800",color:"#F97316",marginBottom:"1rem"}}>${selectedProduct.price}</div>
                 <button style={{...s.btn,...s.btnAccent,padding:"12px 24px",fontSize:"16px"}} onClick={()=>addToCart(selectedProduct)}>Add to Cart</button>
               </div>
             </div>
@@ -441,7 +413,7 @@ export default function App() {
                     <div style={{fontWeight:"600",marginBottom:"2px"}}>{p.name}</div>
                     <div style={{fontSize:"11px",color:"#9090A8",marginBottom:"6px"}}>by {b?.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
-                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#F97316",marginBottom:"8px"}}>${p.price}</div>
                     <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={e=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
@@ -460,18 +432,18 @@ export default function App() {
                 <div key={c.id} style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 0",borderBottom:"1px solid #2A2A38"}}>
                   <div style={{fontSize:"28px",width:"44px",height:"44px",background:"#1A1A24",borderRadius:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>{c.emoji}</div>
                   <div style={{flex:1}}><div style={{fontWeight:"600",fontSize:"13px"}}>{c.name}</div><div style={{fontSize:"12px",color:"#9090A8"}}>Qty: {c.qty}</div></div>
-                  <div style={{fontWeight:"700",color:"#C8F135"}}>${c.price*c.qty}</div>
+                  <div style={{fontWeight:"700",color:"#F97316"}}>${c.price*c.qty}</div>
                 </div>
               ))}
               <div style={{marginTop:"1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{fontSize:"12px",color:"#9090A8"}}>Total</div><div style={{fontSize:"24px",fontWeight:"800",color:"#C8F135"}}>${cartTotal}</div></div>
+                <div><div style={{fontSize:"12px",color:"#9090A8"}}>Total</div><div style={{fontSize:"24px",fontWeight:"800",color:"#F97316"}}>${cartTotal}</div></div>
                 <button style={{...s.btn,...s.btnAccent}} onClick={()=>{setCart([]);showToast("🎉 Order placed!")}}>Checkout →</button>
               </div>
             </div>}
           </div>
         )}
 
-        {/* FOUNDER */}
+        {/* BUSINESS OWNER DASHBOARD */}
         {portal==="founder"&&view==="home"&&(
           <div>
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem",display:"flex",gap:"1rem",alignItems:"center"}}>
@@ -480,7 +452,7 @@ export default function App() {
             </div>
             <div style={s.statsGrid}>
               {[["Products",founderProducts.length,"Listed"],["Reviews",getBizReviews(founderBiz.id).length,"Received"],["Views","142","This week"],["Orders","3","All time"]].map(([l,v,sub])=>(
-                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#F97316"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
           </div>
@@ -504,91 +476,8 @@ export default function App() {
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
-                    <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
+                    <div style={{fontSize:"18px",fontWeight:"800",color:"#F97316",marginBottom:"8px"}}>${p.price}</div>
                     <button style={{...s.btn,...s.btnDanger,width:"100%",fontSize:"12px"}} onClick={()=>deleteProduct(p.id)}>Remove</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ADMIN */}
-        {portal==="admin"&&view==="home"&&(
-          <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
-            <div style={s.statsGrid}>
-              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Reviews",reviews.length,"Total"]].map(([l,v,sub])=>(
-                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
-              ))}
-            </div>
-            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem",paddingBottom:"6px",borderBottom:"1px solid #2A2A38"}}>Pending Applications</div>
-            {applications.filter(a=>a.status==="pending").map(a=>(
-              <div key={a.id} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
-                <div><div style={{fontWeight:"600"}}>{a.bizName}</div><div style={{fontSize:"12px",color:"#9090A8"}}>{a.founder} · {a.uni} · {a.date}</div></div>
-                <div style={{display:"flex",gap:"8px"}}>
-                  <button style={{...s.btn,...s.btnSuccess,fontSize:"12px"}} onClick={()=>approve(a.id)}>Approve</button>
-                  <button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>reject(a.id)}>Reject</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {portal==="admin"&&view==="upload"&&(
-          <div>
-            <div style={{marginBottom:"1.5rem"}}>
-              <h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2>
-              <div style={{fontSize:"12px",color:"#C8F135",fontWeight:"600",display:"flex",alignItems:"center",gap:"6px"}}>
-                <span style={{fontSize:"10px",padding:"2px 6px",background:"#C8F135",color:"#0A0A0F",borderRadius:"10px",fontWeight:"800"}}>ADMIN ONLY</span>
-                Restricted Media upload for verified content
-              </div>
-            </div>
-            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem"}}>
-              <input style={s.input} placeholder="Business name" value={newPost.businessName} onChange={e=>setNewPost(p=>({...p,businessName:e.target.value}))} />
-              <input style={s.input} placeholder="Caption" value={newPost.caption} onChange={e=>setNewPost(p=>({...p,caption:e.target.value}))} />
-              <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={uploadMedia} />
-              <button style={{...s.btn,...s.btnAccent,width:"100%",padding:"12px"}} onClick={()=>fileRef.current.click()} disabled={uploading}>
-                {uploading?"Uploading...":"📁 Choose Image or Video"}
-              </button>
-            </div>
-            <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Posted ({posts.length})</div>
-            <MediaFeed posts={posts} isAdmin={true} onDelete={deletePost} />
-          </div>
-        )}
-
-        {portal==="admin"&&view==="applications"&&(
-          <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>All Applications</h2></div>
-            {applications.map(a=>(
-              <div key={a.id} style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"8px",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"8px"}}>
-                <div>
-                  <div style={{fontWeight:"600"}}>{a.bizName}</div>
-                  <div style={{fontSize:"12px",color:"#9090A8"}}>{a.founder} · {a.uni} · {a.email}</div>
-                </div>
-                <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
-                  <span style={{fontSize:"11px",padding:"3px 10px",borderRadius:"20px",background:a.status==="approved"?"rgba(34,197,94,0.15)":a.status==="rejected"?"rgba(255,77,106,0.15)":"rgba(249,115,22,0.15)",color:a.status==="approved"?"#22C55E":a.status==="rejected"?"#FF4D6A":"#F97316",fontWeight:"600"}}>{a.status}</span>
-                  {a.status==="pending"&&<><button style={{...s.btn,...s.btnSuccess,fontSize:"12px"}} onClick={()=>approve(a.id)}>Approve</button><button style={{...s.btn,...s.btnDanger,fontSize:"12px"}} onClick={()=>reject(a.id)}>Reject</button></>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {portal==="admin"&&view==="businesses"&&(
-          <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>All Businesses</h2></div>
-            <div style={s.grid}>
-              {bizList.map(b=>(
-                <div key={b.id} style={s.card}>
-                  <div style={s.cardImg}>{b.emoji}</div>
-                  <div style={s.cardBody}>
-                    <div style={{fontWeight:"600",marginBottom:"4px"}}>{b.name}</div>
-                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{b.desc}</div>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={s.tag}>{b.uni}</span>
-                      <span style={{fontSize:"11px",padding:"3px 8px",borderRadius:"20px",background:b.status==="approved"?"rgba(34,197,94,0.15)":"rgba(249,115,22,0.15)",color:b.status==="approved"?"#22C55E":"#F97316",fontWeight:"600"}}>{b.status}</span>
-                    </div>
                   </div>
                 </div>
               ))}
