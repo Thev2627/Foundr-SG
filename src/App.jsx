@@ -294,7 +294,7 @@ export default function App() {
           </div>
         ))}
       </div>
-      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem",cursor:"pointer"}} onClick={()=>setPortal("admin")}>v1.0</p>
+      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem",cursor:"pointer",padding:"4px 8px",borderRadius:"4px",border:"1px solid transparent"}} onClick={()=>setPortal("admin")} onMouseEnter={(e)=>e.target.style.borderColor="#C8F135"} onMouseLeave={(e)=>e.target.style.borderColor="transparent"}>v1.0 ⚡ Admin</p>
     </div>
   )
 
@@ -338,7 +338,7 @@ export default function App() {
         {/* FEED */}
         {(portal==="consumer"||portal==="founder")&&view==="feed"&&(
           <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Featured 📱</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Latest from student businesses</p></div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Featured 📱</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Admin-curated content from verified student businesses</p></div>
             <MediaFeed posts={posts} isAdmin={false} onDelete={()=>{}} />
           </div>
         )}
@@ -529,7 +529,13 @@ export default function App() {
 
         {portal==="admin"&&view==="upload"&&(
           <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2></div>
+            <div style={{marginBottom:"1.5rem"}}>
+              <h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2>
+              <div style={{fontSize:"12px",color:"#C8F135",fontWeight:"600",display:"flex",alignItems:"center",gap:"6px"}}>
+                <span style={{fontSize:"10px",padding:"2px 6px",background:"#C8F135",color:"#0A0A0F",borderRadius:"10px",fontWeight:"800"}}>ADMIN ONLY</span>
+                Restricted media upload for verified content
+              </div>
+            </div>
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem"}}>
               <input style={s.input} placeholder="Business name" value={newPost.businessName} onChange={e=>setNewPost(p=>({...p,businessName:e.target.value}))} />
               <input style={s.input} placeholder="Caption" value={newPost.caption} onChange={e=>setNewPost(p=>({...p,caption:e.target.value}))} />
