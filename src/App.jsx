@@ -237,27 +237,34 @@ export default function App() {
     showToast("🗑️ Product removed")
   }
 
-  const uploadMedia = async (e) => {
-    const file = e.target.files[0]
-    if(!file) return
-    if(!newPost.caption||!newPost.businessName){showToast("⚠️ Fill in caption and business name first");return}
-    setUploading(true)
-    try {
-      const ext = file.name.split(".").pop()
-      const filename = `${Date.now()}.${ext}`
-      const { error:uploadError } = await supabase.storage.from("media").upload(filename,file,{upsert:true})
-      if(uploadError) throw uploadError
-      const { data:urlData } = supabase.storage.from("media").getPublicUrl(filename)
-      const isVideo = file.type.startsWith("video")
-      const post = { caption:newPost.caption, business_name:newPost.businessName, url:urlData.publicUrl, type:isVideo?"video":"image", date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
-      const { data, error } = await supabase.from("posts").insert([post]).select()
-      if(error) throw error
-      setPosts(prev=>[data[0],...prev])
-      setNewPost({caption:"",businessName:""})
-      showToast("✓ Post uploaded!")
-    } catch(err){ showToast("❌ Upload failed"); console.error(err) }
-    setUploading(false)
+ const uploadMedia = async (e) => {
+  const file = e.target.files[0]
+  if(!file) return
+  if(!newPost.caption||!newPost.businessName){showToast("⚠️ Fill in caption and business name first");fileRef.current.value="";return}
+  setUploading(true)
+  try {
+    const ext = file.name.split(".").pop()
+    const filename = `${Date.now()}.${ext}`
+    console.log("Uploading to bucket: Media, filename:", filename)
+    const { data:uploadData, error:uploadError } = await supabase.storage.from("Media").upload(filename,file,{upsert:true})
+    console.log("Upload result:", uploadData, uploadError)
+    if(uploadError) throw uploadError
+    const { data:urlData } = supabase.storage.from("Media").getPublicUrl(filename)
+    console.log("Public URL:", urlData.publicUrl)
+    const isVideo = file.type.startsWith("video")
+    const post = { caption:newPost.caption, business_name:newPost.businessName, url:urlData.publicUrl, type:isVideo?"video":"image", date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
+    const { data, error } = await supabase.from("posts").insert([post]).select()
+    if(error) throw error
+    setPosts(prev=>[data[0],...prev])
+    setNewPost({caption:"",businessName:""})
+    fileRef.current.value=""
+    showToast("✓ Post uploaded!")
+  } catch(err){ 
+    showToast("❌ Upload failed: " + err.message)
+    console.error("Full error:", err) 
   }
+  setUploading(false)
+}
 
   const deletePost = async (id) => {
     await supabase.from("posts").delete().eq("id",id)
@@ -533,7 +540,7 @@ export default function App() {
               <h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2>
               <div style={{fontSize:"12px",color:"#C8F135",fontWeight:"600",display:"flex",alignItems:"center",gap:"6px"}}>
                 <span style={{fontSize:"10px",padding:"2px 6px",background:"#C8F135",color:"#0A0A0F",borderRadius:"10px",fontWeight:"800"}}>ADMIN ONLY</span>
-                Restricted media upload for verified content
+                Restricted Media upload for verified content
               </div>
             </div>
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem"}}>
