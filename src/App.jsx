@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
 
 const supabase = createClient(
@@ -14,7 +14,7 @@ const businesses = [
   { id:5, name:"GlowLab SG", category:"Health", desc:"Handmade skincare and lip balms with natural ingredients", emoji:"🌿", uni:"NUS", founder:"Sophie Chen", status:"approved" },
 ]
 
-const allProducts = [
+const defaultProducts = [
   { id:1, name:"Croissant Box (6 pcs)", bizId:1, price:22, emoji:"🥐", desc:"Buttery all-butter croissants, baked fresh" },
   { id:2, name:"Matcha Madeleine Set", bizId:1, price:18, emoji:"🍵", desc:"12 pieces of matcha madeleines" },
   { id:3, name:"Vintage Denim Jacket", bizId:2, price:45, emoji:"🧥", desc:"Upcycled Y2K denim, one of a kind" },
@@ -23,18 +23,6 @@ const allProducts = [
   { id:6, name:"Notion Template Pack", bizId:4, price:12, emoji:"📋", desc:"5 aesthetic Notion templates" },
   { id:7, name:"Rose Glow Facial Oil", bizId:5, price:28, emoji:"🌹", desc:"Natural rosehip & jojoba blend" },
   { id:8, name:"Honey Lip Set (3 pcs)", bizId:5, price:15, emoji:"🍯", desc:"3 flavours of handmade lip balm" },
-]
-
-const sampleReviews = [
-  // Product reviews
-  { id:1, type:"product", targetId:1, userName:"Sarah L.", rating:5, comment:"Absolutely delicious! Fresh and buttery. Will order again!", date:"3 May 2026" },
-  { id:2, type:"product", targetId:1, userName:"Mike T.", rating:4, comment:"Great croissants, just a bit pricey but worth it", date:"2 May 2026" },
-  { id:3, type:"product", targetId:3, userName:"Emma W.", rating:5, comment:"Love the upcycled style! Fits perfectly and unique design", date:"1 May 2026" },
-  { id:4, type:"product", targetId:7, userName:"Lisa K.", rating:5, comment:"My skin feels amazing! Natural ingredients work wonders", date:"4 May 2026" },
-  // Business reviews
-  { id:5, type:"business", targetId:1, userName:"John D.", rating:5, comment:"Amazing pastries! Clara is so talented and the quality is top-notch", date:"3 May 2026" },
-  { id:6, type:"business", targetId:2, userName:"Priya S.", rating:4, comment:"Love the sustainable fashion concept. Great customer service!", date:"2 May 2026" },
-  { id:7, type:"business", targetId:5, userName:"Rachel M.", rating:5, comment:"GlowLab products are incredible. Sophie really knows her skincare!", date:"1 May 2026" },
 ]
 
 const s = {
@@ -67,17 +55,16 @@ const s = {
   starEmpty:{fontSize:"16px",color:"#2A2A38"},
 }
 
-// Review Components
 function ReviewCard({ review }) {
   return (
     <div style={s.reviewCard}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
-        <div style={{fontWeight:"600",fontSize:"14px"}}>{review.userName}</div>
+        <div style={{fontWeight:"600",fontSize:"14px"}}>{review.user_name||review.userName}</div>
         <div style={{fontSize:"12px",color:"#9090A8"}}>{review.date}</div>
       </div>
       <div style={s.stars}>
-        {[...Array(5)].map((_,i) => (
-          <span key={i} style={i < review.rating ? s.star : s.starEmpty}>★</span>
+        {[...Array(5)].map((_,i)=>(
+          <span key={i} style={i<review.rating?s.star:s.starEmpty}>★</span>
         ))}
       </div>
       <div style={{fontSize:"14px",color:"#F0F0F5"}}>{review.comment}</div>
@@ -89,55 +76,41 @@ function ReviewForm({ onSubmit, newReview, setNewReview }) {
   return (
     <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
       <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>Write a Review</div>
-      <input 
-        style={s.input} 
-        placeholder="Your name" 
-        value={newReview.userName} 
-        onChange={e=>setNewReview(r=>({...r,userName:e.target.value}))} 
-      />
+      <input style={s.input} placeholder="Your name" value={newReview.userName} onChange={e=>setNewReview(r=>({...r,userName:e.target.value}))} />
       <div style={{marginBottom:"1rem"}}>
         <label style={{fontSize:"13px",color:"#9090A8",marginBottom:"6px",display:"block"}}>Rating</label>
         <div style={s.stars}>
-          {[...Array(5)].map((_,i) => (
-            <span 
-              key={i} 
-              style={{...s.star, cursor:"pointer", opacity: i < newReview.rating ? 1 : 0.3}} 
-              onClick={()=>setNewReview(r=>({...r,rating:i+1}))}
-            >★</span>
+          {[...Array(5)].map((_,i)=>(
+            <span key={i} style={{...s.star,cursor:"pointer",opacity:i<newReview.rating?1:0.3}} onClick={()=>setNewReview(r=>({...r,rating:i+1}))}>★</span>
           ))}
         </div>
       </div>
-      <textarea 
-        style={{...s.input, minHeight:"80px", resize:"vertical"}} 
-        placeholder="Share your thoughts..." 
-        value={newReview.comment} 
-        onChange={e=>setNewReview(r=>({...r,comment:e.target.value}))} 
-      />
+      <textarea style={{...s.input,minHeight:"80px",resize:"vertical"}} placeholder="Share your thoughts..." value={newReview.comment} onChange={e=>setNewReview(r=>({...r,comment:e.target.value}))} />
       <button style={{...s.btn,...s.btnAccent}} onClick={onSubmit}>Submit Review</button>
     </div>
   )
 }
 
-function ReviewSummary({ type, targetId, getAverageRating, getReviewCount }) {
-  const avgRating = getAverageRating(type, targetId)
-  const reviewCount = getReviewCount(type, targetId)
+function ReviewSummary({ type, targetId, reviews }) {
+  const targetReviews = reviews.filter(r=>r.type===type&&(r.target_id===String(targetId)||r.targetId===targetId))
+  if(targetReviews.length===0) return null
+  const avg = (targetReviews.reduce((sum,r)=>sum+r.rating,0)/targetReviews.length).toFixed(1)
   return (
     <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"1rem"}}>
       <div style={s.stars}>
-        {[...Array(5)].map((_,i) => (
-          <span key={i} style={i < Math.floor(avgRating) ? s.star : s.starEmpty}>★</span>
+        {[...Array(5)].map((_,i)=>(
+          <span key={i} style={i<Math.floor(avg)?s.star:s.starEmpty}>★</span>
         ))}
       </div>
-      <span style={{fontSize:"14px",color:"#C8F135",fontWeight:"600"}}>{avgRating}</span>
-      <span style={{fontSize:"12px",color:"#9090A8"}}>({reviewCount} reviews)</span>
+      <span style={{fontSize:"14px",color:"#C8F135",fontWeight:"600"}}>{avg}</span>
+      <span style={{fontSize:"12px",color:"#9090A8"}}>({targetReviews.length} reviews)</span>
     </div>
   )
 }
 
-// TikTok style feed
 function MediaFeed({ posts, onDelete, isAdmin }) {
   const [current, setCurrent] = useState(0)
-  if(posts.length === 0) return (
+  if(posts.length===0) return (
     <div style={{textAlign:"center",padding:"3rem",color:"#9090A8"}}>
       <div style={{fontSize:"40px",marginBottom:"1rem"}}>📱</div>
       <p>No posts yet — check back soon!</p>
@@ -147,16 +120,16 @@ function MediaFeed({ posts, onDelete, isAdmin }) {
   return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"1rem"}}>
       <div style={{width:"100%",maxWidth:"400px",background:"#16161F",borderRadius:"16px",overflow:"hidden",border:"1px solid #2A2A38",position:"relative"}}>
-        {post.type === "video" ? (
+        {post.type==="video"?(
           <video src={post.url} controls autoPlay muted loop style={{width:"100%",maxHeight:"600px",objectFit:"cover",display:"block"}} />
-        ) : (
+        ):(
           <img src={post.url} alt={post.caption} style={{width:"100%",maxHeight:"600px",objectFit:"cover",display:"block"}} />
         )}
         <div style={{padding:"1rem"}}>
           <div style={{fontWeight:"600",marginBottom:"4px"}}>{post.caption}</div>
-          <div style={{fontSize:"12px",color:"#9090A8"}}>{post.businessName} · {post.date}</div>
+          <div style={{fontSize:"12px",color:"#9090A8"}}>{post.business_name||post.businessName} · {post.date}</div>
         </div>
-        {isAdmin && (
+        {isAdmin&&(
           <button style={{position:"absolute",top:"10px",right:"10px",...s.btn,...s.btnDanger,fontSize:"11px",padding:"4px 10px"}} onClick={()=>onDelete(post.id)}>Remove</button>
         )}
       </div>
@@ -173,8 +146,8 @@ function AdminLogin({ onLogin }) {
   const [pw, setPw] = useState("")
   const [error, setError] = useState(false)
   const handle = () => {
-    if(pw === "foundrsg2026") { onLogin() }
-    else { setError(true); setTimeout(()=>setError(false),2000) }
+    if(pw==="foundrsg2026"){onLogin()}
+    else{setError(true);setTimeout(()=>setError(false),2000)}
   }
   return (
     <div style={{...s.page,...s.center}}>
@@ -194,13 +167,14 @@ export default function App() {
   const [portal, setPortal] = useState(null)
   const [view, setView] = useState("home")
   const [cart, setCart] = useState([])
-  const [products, setProducts] = useState(allProducts)
+  const [products, setProducts] = useState(defaultProducts)
   const [bizList, setBizList] = useState(businesses)
   const [applications, setApplications] = useState([
     { id:1, bizName:"Boba Theory", founder:"Ryan Ong", uni:"SUTD", category:"Food & Drinks", email:"ryan@student.sutd.edu.sg", status:"pending", date:"2 May 2026" },
     { id:2, bizName:"CoachBot SG", founder:"Wei Jie Tan", uni:"NUS", category:"Services", email:"weijie@u.nus.edu", status:"pending", date:"1 May 2026" },
   ])
   const [selectedBiz, setSelectedBiz] = useState(null)
+  const [selectedProduct, setSelectedProduct] = useState(null)
   const [newProduct, setNewProduct] = useState({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
   const [toast, setToast] = useState(null)
   const [activeFilter, setActiveFilter] = useState("All")
@@ -208,13 +182,33 @@ export default function App() {
   const [posts, setPosts] = useState([])
   const [uploading, setUploading] = useState(false)
   const [newPost, setNewPost] = useState({caption:"",businessName:""})
-  const [reviews, setReviews] = useState(sampleReviews)
-  const [selectedProduct, setSelectedProduct] = useState(null)
-  const [newReview, setNewReview] = useState({rating:5, comment:"", userName:""})
+  const [reviews, setReviews] = useState([])
+  const [newReview, setNewReview] = useState({rating:5,comment:"",userName:""})
+  const [loading, setLoading] = useState(true)
   const fileRef = useRef()
 
+  // Load all data from Supabase on startup
+  useEffect(()=>{ loadAll() },[])
+
+  const loadAll = async () => {
+    setLoading(true)
+    try {
+      const [postsRes, reviewsRes, productsRes] = await Promise.all([
+        supabase.from("posts").select("*").order("created_at",{ascending:false}),
+        supabase.from("reviews").select("*").order("created_at",{ascending:false}),
+        supabase.from("products").select("*").order("created_at",{ascending:true}),
+      ])
+      if(postsRes.data) setPosts(postsRes.data)
+      if(reviewsRes.data) setReviews(reviewsRes.data)
+      if(productsRes.data&&productsRes.data.length>0) {
+        setProducts(productsRes.data.map(p=>({...p,bizId:p.biz_id,desc:p.description})))
+      }
+    } catch(err){ console.error(err) }
+    setLoading(false)
+  }
+
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
-  const addToCart = (p) => { setCart(c => { const e=c.find(x=>x.id===p.id); return e?c.map(x=>x.id===p.id?{...x,qty:x.qty+1}:x):[...c,{...p,qty:1}] }); showToast(`✓ ${p.name} added to cart!`) }
+  const addToCart = (p) => { setCart(c=>{ const e=c.find(x=>x.id===p.id); return e?c.map(x=>x.id===p.id?{...x,qty:x.qty+1}:x):[...c,{...p,qty:1}] }); showToast(`✓ ${p.name} added to cart!`) }
   const cartCount = cart.reduce((a,b)=>a+b.qty,0)
   const cartTotal = cart.reduce((a,b)=>a+b.price*b.qty,0)
   const enterPortal = (p) => { setPortal(p); setView("home") }
@@ -222,15 +216,25 @@ export default function App() {
   const approvedBiz = bizList.filter(b=>b.status==="approved")
   const filteredBiz = activeFilter==="All"?approvedBiz:approvedBiz.filter(b=>b.category===activeFilter)
   const founderBiz = bizList[0]
-  const founderProducts = products.filter(p=>p.bizId===founderBiz.id)
+  const founderProducts = products.filter(p=>(p.bizId||p.biz_id)===founderBiz.id)
+
   const approve = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"approved"}:x)); setBizList(b=>b.map(x=>x.name===applications.find(a=>a.id===id)?.bizName?{...x,status:"approved"}:x)); showToast("✓ Application approved!") }
   const reject = (id) => { setApplications(a=>a.map(x=>x.id===id?{...x,status:"rejected"}:x)); showToast("✗ Application rejected") }
-  const addProduct = () => {
+
+  const addProduct = async () => {
     if(!newProduct.name||!newProduct.price){showToast("⚠️ Fill in name and price");return}
-    const p={...newProduct,id:Date.now(),bizId:founderBiz.id,price:parseFloat(newProduct.price),emoji:newProduct.emoji||"📦"}
-    setProducts(prev=>[...prev,p])
+    const p = { name:newProduct.name, description:newProduct.desc, price:parseFloat(newProduct.price), emoji:newProduct.emoji||"📦", biz_id:founderBiz.id }
+    const { data, error } = await supabase.from("products").insert([p]).select()
+    if(error){ showToast("❌ Failed to add product"); console.error(error); return }
+    setProducts(prev=>[...prev,{...data[0],bizId:data[0].biz_id,desc:data[0].description}])
     setNewProduct({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
     showToast("✓ Product added!")
+  }
+
+  const deleteProduct = async (id) => {
+    await supabase.from("products").delete().eq("id",id)
+    setProducts(prev=>prev.filter(p=>p.id!==id))
+    showToast("🗑️ Product removed")
   }
 
   const uploadMedia = async (e) => {
@@ -241,57 +245,40 @@ export default function App() {
     try {
       const ext = file.name.split(".").pop()
       const filename = `${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from("media").upload(filename, file, { upsert: true })
-      if(error) throw error
-      const { data: urlData } = supabase.storage.from("media").getPublicUrl(filename)
+      const { error:uploadError } = await supabase.storage.from("media").upload(filename,file,{upsert:true})
+      if(uploadError) throw uploadError
+      const { data:urlData } = supabase.storage.from("media").getPublicUrl(filename)
       const isVideo = file.type.startsWith("video")
-      const post = {
-        id: Date.now(),
-        url: urlData.publicUrl,
-        type: isVideo ? "video" : "image",
-        caption: newPost.caption,
-        businessName: newPost.businessName,
-        date: new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"})
-      }
-      setPosts(prev=>[post,...prev])
+      const post = { caption:newPost.caption, business_name:newPost.businessName, url:urlData.publicUrl, type:isVideo?"video":"image", date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
+      const { data, error } = await supabase.from("posts").insert([post]).select()
+      if(error) throw error
+      setPosts(prev=>[data[0],...prev])
       setNewPost({caption:"",businessName:""})
       showToast("✓ Post uploaded!")
-    } catch(err) {
-      showToast("❌ Upload failed — check Supabase storage settings")
-      console.error(err)
-    }
+    } catch(err){ showToast("❌ Upload failed"); console.error(err) }
     setUploading(false)
   }
 
-  const deletePost = (id) => { setPosts(prev=>prev.filter(p=>p.id!==id)); showToast("🗑️ Post removed") }
+  const deletePost = async (id) => {
+    await supabase.from("posts").delete().eq("id",id)
+    setPosts(prev=>prev.filter(p=>p.id!==id))
+    showToast("🗑️ Post removed")
+  }
 
-  const addReview = (type, targetId) => {
-    if(!newReview.comment || !newReview.userName) { showToast("⚠️ Fill in name and comment"); return }
-    const review = {
-      id: Date.now(),
-      type,
-      targetId,
-      userName: newReview.userName,
-      rating: newReview.rating,
-      comment: newReview.comment,
-      date: new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"})
-    }
-    setReviews(prev=>[...prev, review])
-    setNewReview({rating:5, comment:"", userName:""})
+  const addReview = async (type, targetId) => {
+    if(!newReview.comment||!newReview.userName){showToast("⚠️ Fill in name and comment");return}
+    const review = { type, target_id:String(targetId), user_name:newReview.userName, rating:newReview.rating, comment:newReview.comment, date:new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"}) }
+    const { data, error } = await supabase.from("reviews").insert([review]).select()
+    if(error){ showToast("❌ Failed to submit review"); console.error(error); return }
+    setReviews(prev=>[data[0],...prev])
+    setNewReview({rating:5,comment:"",userName:""})
     showToast("✓ Review added!")
   }
 
-  const getAverageRating = (type, targetId) => {
-    const targetReviews = reviews.filter(r => r.type === type && r.targetId === targetId)
-    if(targetReviews.length === 0) return 0
-    return (targetReviews.reduce((sum, r) => sum + r.rating, 0) / targetReviews.length).toFixed(1)
-  }
+  const getBizReviews = (bizId) => reviews.filter(r=>r.type==="business"&&r.target_id===String(bizId))
+  const getProductReviews = (productId) => reviews.filter(r=>r.type==="product"&&r.target_id===String(productId))
 
-  const getReviewCount = (type, targetId) => {
-    return reviews.filter(r => r.type === type && r.targetId === targetId).length
-  }
-
-  if(portal==="admin" && !adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
+  if(portal==="admin"&&!adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
 
   if(!portal) return (
     <div style={{...s.page,...s.center}}>
@@ -307,7 +294,14 @@ export default function App() {
           </div>
         ))}
       </div>
-      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem"}} onClick={()=>setPortal("admin")} >v1.0</p>
+      <p style={{fontSize:"11px",color:"#2A2A38",marginTop:"3rem",cursor:"pointer"}} onClick={()=>setPortal("admin")}>v1.0</p>
+    </div>
+  )
+
+  if(loading) return (
+    <div style={{...s.page,...s.center}}>
+      <div style={{fontSize:"32px",marginBottom:"1rem"}}>⏳</div>
+      <p style={{color:"#9090A8"}}>Loading Foundr SG...</p>
     </div>
   )
 
@@ -341,7 +335,7 @@ export default function App() {
 
       <div style={s.main}>
 
-        {/* FEED - shown to consumer and founder */}
+        {/* FEED */}
         {(portal==="consumer"||portal==="founder")&&view==="feed"&&(
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Featured 📱</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Latest from student businesses</p></div>
@@ -349,7 +343,7 @@ export default function App() {
           </div>
         )}
 
-        {/* CONSUMER */}
+        {/* CONSUMER HOME */}
         {portal==="consumer"&&view==="home"&&(
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Discover Student Businesses 🔍</h2><p style={{color:"#9090A8",fontSize:"14px"}}>All verified student-run</p></div>
@@ -374,6 +368,7 @@ export default function App() {
           </div>
         )}
 
+        {/* BIZ DETAIL */}
         {portal==="consumer"&&view==="bizdetail"&&selectedBiz&&(
           <div>
             <button style={{...s.btn,...s.btnOutline,marginBottom:"1rem",fontSize:"12px"}} onClick={()=>setView("home")}>← Back</button>
@@ -387,34 +382,26 @@ export default function App() {
             </div>
             <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Products</div>
             <div style={s.grid}>
-              {products.filter(p=>p.bizId===selectedBiz.id).map(p=>(
+              {products.filter(p=>(p.bizId||p.biz_id)===selectedBiz.id).map(p=>(
                 <div key={p.id} style={s.card} onClick={()=>{setSelectedProduct(p);setView("productdetail")}}>
                   <div style={s.cardImg}>{p.emoji}</div>
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
-                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
                     <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
-                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={(e)=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
+                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={e=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
               ))}
             </div>
-            
             <div style={{fontWeight:"700",fontSize:"18px",marginTop:"2rem",marginBottom:"1rem"}}>Business Reviews</div>
-            <ReviewSummary type="business" targetId={selectedBiz.id} getAverageRating={getAverageRating} getReviewCount={getReviewCount} />
-            <ReviewForm 
-              onSubmit={()=>addReview("business", selectedBiz.id)} 
-              newReview={newReview} 
-              setNewReview={setNewReview} 
-            />
-            <div>
-              {reviews.filter(r=>r.type==="business"&&r.targetId===selectedBiz.id).map(review=>(
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </div>
+            <ReviewSummary type="business" targetId={selectedBiz.id} reviews={reviews} />
+            <ReviewForm onSubmit={()=>addReview("business",selectedBiz.id)} newReview={newReview} setNewReview={setNewReview} />
+            {getBizReviews(selectedBiz.id).map(r=><ReviewCard key={r.id} review={r} />)}
           </div>
         )}
 
+        {/* PRODUCT DETAIL */}
         {portal==="consumer"&&view==="productdetail"&&selectedProduct&&(
           <div>
             <button style={{...s.btn,...s.btnOutline,marginBottom:"1rem",fontSize:"12px"}} onClick={()=>setView("bizdetail")}>← Back</button>
@@ -422,40 +409,32 @@ export default function App() {
               <div style={{fontSize:"80px",width:"120px",height:"120px",background:"#1A1A24",borderRadius:"16px",display:"flex",alignItems:"center",justifyContent:"center"}}>{selectedProduct.emoji}</div>
               <div style={{flex:1,minWidth:"250px"}}>
                 <div style={{fontWeight:"700",fontSize:"24px",marginBottom:"8px"}}>{selectedProduct.name}</div>
-                <div style={{fontSize:"16px",color:"#9090A8",marginBottom:"1rem"}}>{selectedProduct.desc}</div>
+                <div style={{fontSize:"16px",color:"#9090A8",marginBottom:"1rem"}}>{selectedProduct.desc||selectedProduct.description}</div>
                 <div style={{fontSize:"32px",fontWeight:"800",color:"#C8F135",marginBottom:"1rem"}}>${selectedProduct.price}</div>
                 <button style={{...s.btn,...s.btnAccent,padding:"12px 24px",fontSize:"16px"}} onClick={()=>addToCart(selectedProduct)}>Add to Cart</button>
               </div>
             </div>
-            
             <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"1rem"}}>Reviews</div>
-            <ReviewSummary type="product" targetId={selectedProduct.id} getAverageRating={getAverageRating} getReviewCount={getReviewCount} />
-            <ReviewForm 
-              onSubmit={()=>addReview("product", selectedProduct.id)} 
-              newReview={newReview} 
-              setNewReview={setNewReview} 
-            />
-            <div>
-              {reviews.filter(r=>r.type==="product"&&r.targetId===selectedProduct.id).map(review=>(
-                <ReviewCard key={review.id} review={review} />
-              ))}
-            </div>
+            <ReviewSummary type="product" targetId={selectedProduct.id} reviews={reviews} />
+            <ReviewForm onSubmit={()=>addReview("product",selectedProduct.id)} newReview={newReview} setNewReview={setNewReview} />
+            {getProductReviews(selectedProduct.id).map(r=><ReviewCard key={r.id} review={r} />)}
           </div>
         )}
 
+        {/* SHOP */}
         {portal==="consumer"&&view==="shop"&&(
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Shop All Products 🛒</h2></div>
             <div style={s.grid}>
-              {products.map(p=>{const b=bizList.find(x=>x.id===p.bizId);return(
+              {products.map(p=>{const b=bizList.find(x=>x.id===(p.bizId||p.biz_id));return(
                 <div key={p.id} style={s.card} onClick={()=>{setSelectedProduct(p);setView("productdetail")}}>
                   <div style={s.cardImg}>{p.emoji}</div>
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"2px"}}>{p.name}</div>
                     <div style={{fontSize:"11px",color:"#9090A8",marginBottom:"6px"}}>by {b?.name}</div>
-                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
                     <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
-                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={(e)=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
+                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={e=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
               )})}
@@ -463,6 +442,7 @@ export default function App() {
           </div>
         )}
 
+        {/* CART */}
         {portal==="consumer"&&view==="cart"&&(
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Your Cart 🛒</h2></div>
@@ -491,7 +471,7 @@ export default function App() {
               <div><div style={{fontWeight:"700",fontSize:"18px"}}>{founderBiz.name}</div><div style={{color:"#9090A8",fontSize:"13px"}}>{founderBiz.category} · {founderBiz.uni} · <span style={{color:"#22C55E",fontWeight:"600"}}>✓ Approved</span></div></div>
             </div>
             <div style={s.statsGrid}>
-              {[["Products",founderProducts.length,"Listed"],["Revenue","$"+(founderProducts.reduce((a,b)=>a+b.price,0)),"SGD"],["Views","142","This week"],["Orders","3","All time"]].map(([l,v,sub])=>(
+              {[["Products",founderProducts.length,"Listed"],["Reviews",getBizReviews(founderBiz.id).length,"Received"],["Views","142","This week"],["Orders","3","All time"]].map(([l,v,sub])=>(
                 <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
@@ -500,9 +480,7 @@ export default function App() {
 
         {portal==="founder"&&view==="products"&&(
           <div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.5rem"}}>
-              <h2 style={{fontWeight:"800"}}>My Products</h2>
-            </div>
+            <h2 style={{fontWeight:"800",marginBottom:"1.5rem"}}>My Products</h2>
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
               <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>+ Add New Product</div>
               <input style={s.input} placeholder="Product name" value={newProduct.name} onChange={e=>setNewProduct(p=>({...p,name:e.target.value}))} />
@@ -517,9 +495,9 @@ export default function App() {
                   <div style={s.cardImg}>{p.emoji}</div>
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
-                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
+                    <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc||p.description}</div>
                     <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
-                    <button style={{...s.btn,...s.btnDanger,width:"100%",fontSize:"12px"}} onClick={()=>{setProducts(prev=>prev.filter(x=>x.id!==p.id));showToast("🗑️ Product removed")}}>Remove</button>
+                    <button style={{...s.btn,...s.btnDanger,width:"100%",fontSize:"12px"}} onClick={()=>deleteProduct(p.id)}>Remove</button>
                   </div>
                 </div>
               ))}
@@ -532,7 +510,7 @@ export default function App() {
           <div>
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Admin Overview ⚡</h2></div>
             <div style={s.statsGrid}>
-              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Products",products.length,"Listed"]].map(([l,v,sub])=>(
+              {[["Active Businesses",bizList.filter(b=>b.status==="approved").length,"Verified"],["Pending",applications.filter(a=>a.status==="pending").length,"To review"],["Posts",posts.length,"In feed"],["Reviews",reviews.length,"Total"]].map(([l,v,sub])=>(
                 <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#C8F135"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
@@ -551,13 +529,13 @@ export default function App() {
 
         {portal==="admin"&&view==="upload"&&(
           <div>
-            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2><p style={{color:"#9090A8",fontSize:"14px"}}>Upload images or videos to the feed</p></div>
+            <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Upload Media 📤</h2></div>
             <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.5rem",marginBottom:"1.5rem"}}>
-              <input style={s.input} placeholder="Business name e.g. Crème by Clara" value={newPost.businessName} onChange={e=>setNewPost(p=>({...p,businessName:e.target.value}))} />
-              <input style={s.input} placeholder="Caption e.g. Fresh croissants this Sunday!" value={newPost.caption} onChange={e=>setNewPost(p=>({...p,caption:e.target.value}))} />
+              <input style={s.input} placeholder="Business name" value={newPost.businessName} onChange={e=>setNewPost(p=>({...p,businessName:e.target.value}))} />
+              <input style={s.input} placeholder="Caption" value={newPost.caption} onChange={e=>setNewPost(p=>({...p,caption:e.target.value}))} />
               <input ref={fileRef} type="file" accept="image/*,video/*" style={{display:"none"}} onChange={uploadMedia} />
               <button style={{...s.btn,...s.btnAccent,width:"100%",padding:"12px"}} onClick={()=>fileRef.current.click()} disabled={uploading}>
-                {uploading ? "Uploading..." : "📁 Choose Image or Video"}
+                {uploading?"Uploading...":"📁 Choose Image or Video"}
               </button>
             </div>
             <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Posted ({posts.length})</div>
