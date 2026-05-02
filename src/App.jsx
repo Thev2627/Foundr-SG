@@ -25,6 +25,18 @@ const allProducts = [
   { id:8, name:"Honey Lip Set (3 pcs)", bizId:5, price:15, emoji:"🍯", desc:"3 flavours of handmade lip balm" },
 ]
 
+const sampleReviews = [
+  // Product reviews
+  { id:1, type:"product", targetId:1, userName:"Sarah L.", rating:5, comment:"Absolutely delicious! Fresh and buttery. Will order again!", date:"3 May 2026" },
+  { id:2, type:"product", targetId:1, userName:"Mike T.", rating:4, comment:"Great croissants, just a bit pricey but worth it", date:"2 May 2026" },
+  { id:3, type:"product", targetId:3, userName:"Emma W.", rating:5, comment:"Love the upcycled style! Fits perfectly and unique design", date:"1 May 2026" },
+  { id:4, type:"product", targetId:7, userName:"Lisa K.", rating:5, comment:"My skin feels amazing! Natural ingredients work wonders", date:"4 May 2026" },
+  // Business reviews
+  { id:5, type:"business", targetId:1, userName:"John D.", rating:5, comment:"Amazing pastries! Clara is so talented and the quality is top-notch", date:"3 May 2026" },
+  { id:6, type:"business", targetId:2, userName:"Priya S.", rating:4, comment:"Love the sustainable fashion concept. Great customer service!", date:"2 May 2026" },
+  { id:7, type:"business", targetId:5, userName:"Rachel M.", rating:5, comment:"GlowLab products are incredible. Sophie really knows her skincare!", date:"1 May 2026" },
+]
+
 const s = {
   page:{minHeight:"100vh",background:"#0A0A0F",fontFamily:"'Segoe UI',sans-serif",color:"#F0F0F5"},
   center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100vh",padding:"2rem"},
@@ -49,6 +61,77 @@ const s = {
   statCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem"},
   statsGrid:{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:"1rem",marginBottom:"1.5rem"},
   navBtn:{padding:"6px 14px",borderRadius:"8px",border:"none",background:"transparent",color:"#9090A8",cursor:"pointer",fontSize:"13px",fontFamily:"inherit"},
+  reviewCard:{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1rem",marginBottom:"1rem"},
+  stars:{display:"flex",gap:"2px",marginBottom:"8px"},
+  star:{fontSize:"16px",color:"#C8F135"},
+  starEmpty:{fontSize:"16px",color:"#2A2A38"},
+}
+
+// Review Components
+function ReviewCard({ review }) {
+  return (
+    <div style={s.reviewCard}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+        <div style={{fontWeight:"600",fontSize:"14px"}}>{review.userName}</div>
+        <div style={{fontSize:"12px",color:"#9090A8"}}>{review.date}</div>
+      </div>
+      <div style={s.stars}>
+        {[...Array(5)].map((_,i) => (
+          <span key={i} style={i < review.rating ? s.star : s.starEmpty}>★</span>
+        ))}
+      </div>
+      <div style={{fontSize:"14px",color:"#F0F0F5"}}>{review.comment}</div>
+    </div>
+  )
+}
+
+function ReviewForm({ onSubmit, newReview, setNewReview }) {
+  return (
+    <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
+      <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>Write a Review</div>
+      <input 
+        style={s.input} 
+        placeholder="Your name" 
+        value={newReview.userName} 
+        onChange={e=>setNewReview(r=>({...r,userName:e.target.value}))} 
+      />
+      <div style={{marginBottom:"1rem"}}>
+        <label style={{fontSize:"13px",color:"#9090A8",marginBottom:"6px",display:"block"}}>Rating</label>
+        <div style={s.stars}>
+          {[...Array(5)].map((_,i) => (
+            <span 
+              key={i} 
+              style={{...s.star, cursor:"pointer", opacity: i < newReview.rating ? 1 : 0.3}} 
+              onClick={()=>setNewReview(r=>({...r,rating:i+1}))}
+            >★</span>
+          ))}
+        </div>
+      </div>
+      <textarea 
+        style={{...s.input, minHeight:"80px", resize:"vertical"}} 
+        placeholder="Share your thoughts..." 
+        value={newReview.comment} 
+        onChange={e=>setNewReview(r=>({...r,comment:e.target.value}))} 
+      />
+      <button style={{...s.btn,...s.btnAccent}} onClick={onSubmit}>Submit Review</button>
+    </div>
+  )
+}
+
+function ReviewSummary({ type, targetId, getAverageRating, getReviewCount }) {
+  const avgRating = getAverageRating(type, targetId)
+  const reviewCount = getReviewCount(type, targetId)
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"1rem"}}>
+      <div style={s.stars}>
+        {[...Array(5)].map((_,i) => (
+          <span key={i} style={i < Math.floor(avgRating) ? s.star : s.starEmpty}>★</span>
+        ))}
+      </div>
+      <span style={{fontSize:"14px",color:"#C8F135",fontWeight:"600"}}>{avgRating}</span>
+      <span style={{fontSize:"12px",color:"#9090A8"}}>({reviewCount} reviews)</span>
+    </div>
+  )
 }
 
 // TikTok style feed
@@ -125,6 +208,9 @@ export default function App() {
   const [posts, setPosts] = useState([])
   const [uploading, setUploading] = useState(false)
   const [newPost, setNewPost] = useState({caption:"",businessName:""})
+  const [reviews, setReviews] = useState(sampleReviews)
+  const [selectedProduct, setSelectedProduct] = useState(null)
+  const [newReview, setNewReview] = useState({rating:5, comment:"", userName:""})
   const fileRef = useRef()
 
   const showToast = (msg) => { setToast(msg); setTimeout(()=>setToast(null),2500) }
@@ -155,7 +241,7 @@ export default function App() {
     try {
       const ext = file.name.split(".").pop()
       const filename = `${Date.now()}.${ext}`
-      const { data, error } = await supabase.storage.from("media").upload(filename, file, { upsert: true })
+      const { error } = await supabase.storage.from("media").upload(filename, file, { upsert: true })
       if(error) throw error
       const { data: urlData } = supabase.storage.from("media").getPublicUrl(filename)
       const isVideo = file.type.startsWith("video")
@@ -178,6 +264,32 @@ export default function App() {
   }
 
   const deletePost = (id) => { setPosts(prev=>prev.filter(p=>p.id!==id)); showToast("🗑️ Post removed") }
+
+  const addReview = (type, targetId) => {
+    if(!newReview.comment || !newReview.userName) { showToast("⚠️ Fill in name and comment"); return }
+    const review = {
+      id: Date.now(),
+      type,
+      targetId,
+      userName: newReview.userName,
+      rating: newReview.rating,
+      comment: newReview.comment,
+      date: new Date().toLocaleDateString("en-SG",{day:"numeric",month:"short",year:"numeric"})
+    }
+    setReviews(prev=>[...prev, review])
+    setNewReview({rating:5, comment:"", userName:""})
+    showToast("✓ Review added!")
+  }
+
+  const getAverageRating = (type, targetId) => {
+    const targetReviews = reviews.filter(r => r.type === type && r.targetId === targetId)
+    if(targetReviews.length === 0) return 0
+    return (targetReviews.reduce((sum, r) => sum + r.rating, 0) / targetReviews.length).toFixed(1)
+  }
+
+  const getReviewCount = (type, targetId) => {
+    return reviews.filter(r => r.type === type && r.targetId === targetId).length
+  }
 
   if(portal==="admin" && !adminUnlocked) return <AdminLogin onLogin={()=>setAdminUnlocked(true)} />
 
@@ -276,15 +388,56 @@ export default function App() {
             <div style={{fontWeight:"700",fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.1em",marginBottom:"1rem"}}>Products</div>
             <div style={s.grid}>
               {products.filter(p=>p.bizId===selectedBiz.id).map(p=>(
-                <div key={p.id} style={s.card}>
+                <div key={p.id} style={s.card} onClick={()=>{setSelectedProduct(p);setView("productdetail")}}>
                   <div style={s.cardImg}>{p.emoji}</div>
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"4px"}}>{p.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
                     <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
-                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>
+                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={(e)=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
+              ))}
+            </div>
+            
+            <div style={{fontWeight:"700",fontSize:"18px",marginTop:"2rem",marginBottom:"1rem"}}>Business Reviews</div>
+            <ReviewSummary type="business" targetId={selectedBiz.id} getAverageRating={getAverageRating} getReviewCount={getReviewCount} />
+            <ReviewForm 
+              onSubmit={()=>addReview("business", selectedBiz.id)} 
+              newReview={newReview} 
+              setNewReview={setNewReview} 
+            />
+            <div>
+              {reviews.filter(r=>r.type==="business"&&r.targetId===selectedBiz.id).map(review=>(
+                <ReviewCard key={review.id} review={review} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {portal==="consumer"&&view==="productdetail"&&selectedProduct&&(
+          <div>
+            <button style={{...s.btn,...s.btnOutline,marginBottom:"1rem",fontSize:"12px"}} onClick={()=>setView("bizdetail")}>← Back</button>
+            <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"2rem",marginBottom:"1.5rem",display:"flex",gap:"2rem",alignItems:"flex-start",flexWrap:"wrap"}}>
+              <div style={{fontSize:"80px",width:"120px",height:"120px",background:"#1A1A24",borderRadius:"16px",display:"flex",alignItems:"center",justifyContent:"center"}}>{selectedProduct.emoji}</div>
+              <div style={{flex:1,minWidth:"250px"}}>
+                <div style={{fontWeight:"700",fontSize:"24px",marginBottom:"8px"}}>{selectedProduct.name}</div>
+                <div style={{fontSize:"16px",color:"#9090A8",marginBottom:"1rem"}}>{selectedProduct.desc}</div>
+                <div style={{fontSize:"32px",fontWeight:"800",color:"#C8F135",marginBottom:"1rem"}}>${selectedProduct.price}</div>
+                <button style={{...s.btn,...s.btnAccent,padding:"12px 24px",fontSize:"16px"}} onClick={()=>addToCart(selectedProduct)}>Add to Cart</button>
+              </div>
+            </div>
+            
+            <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"1rem"}}>Reviews</div>
+            <ReviewSummary type="product" targetId={selectedProduct.id} getAverageRating={getAverageRating} getReviewCount={getReviewCount} />
+            <ReviewForm 
+              onSubmit={()=>addReview("product", selectedProduct.id)} 
+              newReview={newReview} 
+              setNewReview={setNewReview} 
+            />
+            <div>
+              {reviews.filter(r=>r.type==="product"&&r.targetId===selectedProduct.id).map(review=>(
+                <ReviewCard key={review.id} review={review} />
               ))}
             </div>
           </div>
@@ -295,14 +448,14 @@ export default function App() {
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Shop All Products 🛒</h2></div>
             <div style={s.grid}>
               {products.map(p=>{const b=bizList.find(x=>x.id===p.bizId);return(
-                <div key={p.id} style={s.card}>
+                <div key={p.id} style={s.card} onClick={()=>{setSelectedProduct(p);setView("productdetail")}}>
                   <div style={s.cardImg}>{p.emoji}</div>
                   <div style={s.cardBody}>
                     <div style={{fontWeight:"600",marginBottom:"2px"}}>{p.name}</div>
                     <div style={{fontSize:"11px",color:"#9090A8",marginBottom:"6px"}}>by {b?.name}</div>
                     <div style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px"}}>{p.desc}</div>
                     <div style={{fontSize:"18px",fontWeight:"800",color:"#C8F135",marginBottom:"8px"}}>${p.price}</div>
-                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={()=>addToCart(p)}>Add to Cart</button>
+                    <button style={{...s.btn,...s.btnAccent,width:"100%"}} onClick={(e)=>{e.stopPropagation();addToCart(p)}}>Add to Cart</button>
                   </div>
                 </div>
               )})}
