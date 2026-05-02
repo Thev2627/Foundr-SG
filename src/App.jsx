@@ -262,7 +262,7 @@ export default function App() {
   if(!portal) return (
     <div style={{...s.page,...s.center,position:"relative",overflow:"hidden"}}>
       {/* Translucent lion watermark - smaller */}
-      <img src="/logo.png" alt="" style={{position:"absolute",width:"300px",height:"300px",objectFit:"contain",opacity:0.07,pointerEvents:"none",zIndex:0,userSelect:"none"}} onError={e=>e.target.style.display="none"} />
+      <img src="/logo.png" alt="" style={{position:"absolute",width:"1200px",height:"1200px",objectFit:"contain",opacity:0.15,pointerEvents:"none",zIndex:0,userSelect:"none"}} onError={e=>e.target.style.display="none"} />
       {/* Business Owner button top left */}
       <div style={{position:"absolute",top:"1rem",left:"1.5rem",zIndex:1}}>
         <button onClick={()=>enterPortal("founder")} style={{background:"transparent",border:"1px solid #2A2A38",borderRadius:"8px",padding:"6px 14px",color:"#F0F0F5",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
