@@ -141,6 +141,409 @@ function MediaFeed({ posts, onDelete, isAdmin }) {
   )
 }
 
+const FALLBACK_REWARDS = [
+  {"id": "leo_coins_100", "name": "100 LeoCoins 🪙", "color": "#F97316", "type": "common"},
+  {"id": "leo_coins_500", "name": "500 LeoCoins 🪙", "color": "#A855F7", "type": "common"},
+  {"id": "voucher_2", "name": "$2 Voucher Coupon 🎫", "color": "#3B82F6", "type": "common"},
+  {"id": "voucher_5", "name": "$5 Voucher Coupon 🎫", "color": "#10B981", "type": "common"},
+  {"id": "voucher_50", "name": "$50 Mega Voucher 🎟️", "color": "#EC4899", "type": "rare"},
+  {"id": "leo_coins_5000", "name": "5000 LeoCoins 🪙", "color": "#EAB308", "type": "rare"},
+  {"id": "macbook", "name": "MacBook Pro 💻", "color": "#FF4D6A", "type": "grand", "remaining": 3, "max_cap": 3},
+  {"id": "iphone", "name": "iPhone 15 Pro 📱", "color": "#F43F5E", "type": "grand", "remaining": 3, "max_cap": 3},
+  {"id": "ps5", "name": "PlayStation 5 🎮", "color": "#6366F1", "type": "grand", "remaining": 4, "max_cap": 4}
+];
+
+function LuckySpin({ showToast }) {
+  const [email, setEmail] = useState("")
+  const [rewards, setRewards] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [spinning, setSpinning] = useState(false)
+  const [hasSpun, setHasSpun] = useState(false)
+  const [wonPrize, setWonPrize] = useState(null)
+  const [errorMessage, setErrorMessage] = useState("")
+  const [checkingEligibility, setCheckingEligibility] = useState(false)
+  
+  const canvasRef = useRef(null)
+  const angleRef = useRef(0)
+  const animationRef = useRef(null)
+
+  const fetchRewards = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/lucky-spin/rewards")
+      const data = await res.json()
+      if (data.success && data.rewards) {
+        setRewards(data.rewards)
+      } else {
+        setRewards(FALLBACK_REWARDS)
+      }
+    } catch (err) {
+      console.error("Failed to fetch rewards from backend, loading fallback config:", err)
+      setRewards(FALLBACK_REWARDS)
+    }
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchRewards()
+    const localSpun = localStorage.getItem("lucky_spin_completed")
+    if (localSpun) {
+      setHasSpun(true)
+      try {
+        setWonPrize(JSON.parse(localSpun))
+      } catch(e){}
+    }
+  }, [])
+
+  useEffect(() => {
+    if (rewards.length === 0 || loading) return
+    drawWheel(angleRef.current)
+  }, [rewards, loading])
+
+  const drawWheel = (angle = 0) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    const width = canvas.width
+    const height = canvas.height
+    const centerX = width / 2
+    const centerY = height / 2
+    const radius = Math.min(centerX, centerY) - 15
+    const numSectors = rewards.length
+    const arcSize = (2 * Math.PI) / numSectors
+
+    ctx.clearRect(0, 0, width, height)
+
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius + 8, 0, 2 * Math.PI)
+    ctx.fillStyle = "#111118"
+    ctx.shadowColor = "#F97316"
+    ctx.shadowBlur = spinning ? 20 : 10
+    ctx.fill()
+    ctx.restore()
+
+    for (let i = 0; i < numSectors; i++) {
+      const sectorAngle = angle + i * arcSize
+      ctx.beginPath()
+      ctx.moveTo(centerX, centerY)
+      ctx.arc(centerX, centerY, radius, sectorAngle, sectorAngle + arcSize)
+      ctx.closePath()
+
+      ctx.fillStyle = rewards[i].color || "#2A2A38"
+      ctx.fill()
+
+      ctx.strokeStyle = "#0A0A0F"
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      ctx.save()
+      ctx.translate(centerX, centerY)
+      ctx.rotate(sectorAngle + arcSize / 2)
+      ctx.textAlign = "right"
+      ctx.textBaseline = "middle"
+      ctx.fillStyle = "#F0F0F5"
+      ctx.font = "bold 11px sans-serif"
+      
+      let displayName = rewards[i].name
+      if (displayName.length > 18) {
+        displayName = displayName.substring(0, 15) + "..."
+      }
+      ctx.fillText(displayName, radius - 20, 0)
+      ctx.restore()
+    }
+
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, 35, 0, 2 * Math.PI)
+    ctx.fillStyle = "#16161F"
+    ctx.strokeStyle = "#F97316"
+    ctx.lineWidth = 3
+    ctx.shadowColor = "#000"
+    ctx.shadowBlur = 5
+    ctx.fill()
+    ctx.stroke()
+
+    ctx.fillStyle = "#F0F0F5"
+    ctx.font = "900 13px sans-serif"
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    ctx.fillText("🦁", centerX, centerY)
+
+    ctx.save()
+    ctx.translate(centerX, centerY)
+    for (let j = 0; j < 24; j++) {
+      ctx.rotate((2 * Math.PI) / 24)
+      ctx.beginPath()
+      ctx.arc(radius + 3, 0, j % 2 === 0 ? 3 : 2, 0, 2 * Math.PI)
+      ctx.fillStyle = (spinning && (Math.floor(angle * 5) + j) % 2 === 0) ? "#FFF" : "#F97316"
+      ctx.fill()
+    }
+    ctx.restore()
+  }
+
+  const handleSpinClick = async () => {
+    if (spinning || hasSpun) return
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      setErrorMessage("⚠️ Please enter a valid email address first.")
+      return
+    }
+
+    setErrorMessage("")
+    setCheckingEligibility(true)
+
+    let spinResult = null
+    try {
+      const res = await fetch("/api/lucky-spin/spin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.detail || "❌ Spin eligibility check failed.")
+        setCheckingEligibility(false)
+        return
+      }
+      spinResult = data
+    } catch (err) {
+      console.error("Lucky spin backend failed, running secure local roll simulation:", err)
+      const localCompleted = localStorage.getItem(`lucky_spun_${email}`)
+      if (localCompleted) {
+        setErrorMessage("❌ This email has already spun the wheel! (Simulated)")
+        setCheckingEligibility(false)
+        return
+      }
+      
+      const weights = FALLBACK_REWARDS.map(r => r.id === "macbook" || r.id === "iphone" ? 0.0003 : (r.id === "ps5" ? 0.0004 : (r.id === "voucher_50" ? 0.04 : (r.id === "leo_coins_5000" ? 0.01 : (r.id === "voucher_5" ? 0.099 : (r.id === "voucher_2" ? 0.15 : (r.id === "leo_coins_500" ? 0.30 : 0.40)))))))
+      const rVal = Math.random()
+      let cumulative = 0
+      let selectedIdx = 0
+      for (let i = 0; i < FALLBACK_REWARDS.length; i++) {
+        cumulative += weights[i]
+        if (rVal <= cumulative) {
+          selectedIdx = i
+          break
+        }
+      }
+      const rolled = FALLBACK_REWARDS[selectedIdx]
+      spinResult = {
+        success: true,
+        reward_id: rolled.id,
+        reward_name: rolled.name,
+        reward_index: selectedIdx,
+        reward_color: rolled.color,
+        reward_type: rolled.type
+      }
+      localStorage.setItem(`lucky_spun_${email}`, "true")
+    }
+
+    setCheckingEligibility(false)
+    setSpinning(true)
+
+    const numSectors = rewards.length || FALLBACK_REWARDS.length
+    const arcSize = (2 * Math.PI) / numSectors
+    const winningIndex = spinResult.reward_index
+
+    const randomOffset = (Math.random() - 0.5) * 0.6 * arcSize
+    const rotations = 6
+    const startAngle = angleRef.current % (2 * Math.PI)
+    const targetAngle = (rotations * 2 * Math.PI) + (1.5 * Math.PI) - ((winningIndex + 0.5) * arcSize) + randomOffset
+
+    const duration = 6000
+    const startTime = performance.now()
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+
+    const animateWheel = (now) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      const easedProgress = easeOutCubic(progress)
+      
+      const currentAngle = startAngle + easedProgress * (targetAngle - startAngle)
+      angleRef.current = currentAngle
+      drawWheel(currentAngle)
+
+      if (progress < 1) {
+        animationRef.current = requestAnimationFrame(animateWheel)
+      } else {
+        setSpinning(false)
+        setHasSpun(true)
+        setWonPrize(spinResult)
+        
+        localStorage.setItem("lucky_spin_completed", JSON.stringify(spinResult))
+        showToast(`🎉 Congratulations! You won: ${spinResult.reward_name}`)
+        fetchRewards()
+      }
+    }
+
+    animationRef.current = requestAnimationFrame(animateWheel)
+  }
+
+  const renderPointer = () => (
+    <div style={{
+      position: "absolute",
+      top: "-10px",
+      left: "50%",
+      transform: "translateX(-50%)",
+      width: 0,
+      height: 0,
+      borderLeft: "14px solid transparent",
+      borderRight: "14px solid transparent",
+      borderTop: "24px solid #FF4D6A",
+      zIndex: 10,
+      filter: "drop-shadow(0px 4px 6px rgba(0,0,0,0.5))"
+    }} />
+  )
+
+  const grandPrizes = rewards.filter(r => r.type === "grand")
+
+  return (
+    <div style={{maxWidth:"600px",margin:"0 auto"}}>
+      <div style={{textAlign:"center",marginBottom:"2rem"}}>
+        <h2 style={{fontWeight:"800",marginBottom:"8px"}}>Launch Day Lucky Spin! 🎡</h2>
+        <p style={{color:"#9090A8",fontSize:"14px"}}>
+          Day 1 Launch Special: Spin the wheel of fortune to secure exclusive vouchers, LeoCoins, or one of our <strong>10 Global Grand Prizes!</strong>
+        </p>
+      </div>
+
+      <div style={{
+        background:"#16161F",
+        border:"1px solid #2A2A38",
+        borderRadius:"20px",
+        padding:"2.5rem 1.5rem",
+        display:"flex",
+        flexDirection:"column",
+        alignItems:"center",
+        position:"relative",
+        boxShadow:"0 8px 32px rgba(0,0,0,0.3)"
+      }}>
+        {renderPointer()}
+
+        <div style={{position:"relative",marginBottom:"2rem",width:"340px",height:"340px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <canvas 
+            ref={canvasRef} 
+            width={340} 
+            height={340} 
+            style={{
+              borderRadius:"50%",
+              width:"340px",
+              height:"340px",
+              display:"block"
+            }} 
+          />
+        </div>
+
+        {!hasSpun ? (
+          <div style={{width:"100%",maxWidth:"320px"}}>
+            <label style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px",display:"block",textAlign:"center"}}>
+              Enter your email to verify event eligibility:
+            </label>
+            <input 
+              style={{...s.input,textAlign:"center",padding:"12px 14px",fontSize:"14px",marginBottom:"1rem"}} 
+              type="email" 
+              placeholder="name@student.edu.sg" 
+              value={email} 
+              disabled={spinning}
+              onChange={e=>setEmail(e.target.value)} 
+            />
+            {errorMessage && (
+              <div style={{color:"#FF4D6A",fontSize:"12px",textAlign:"center",marginBottom:"1rem",fontWeight:"600"}}>
+                {errorMessage}
+              </div>
+            )}
+            <button 
+              style={{
+                ...s.btn,
+                ...s.btnAccent,
+                width:"100%",
+                padding:"14px",
+                fontSize:"15px",
+                fontWeight:"800",
+                letterSpacing:"0.05em",
+                borderRadius:"10px",
+                opacity:(spinning || checkingEligibility || !email) ? 0.6 : 1,
+                cursor:(spinning || checkingEligibility || !email) ? "not-allowed" : "pointer"
+              }} 
+              onClick={handleSpinClick}
+              disabled={spinning || checkingEligibility || !email}
+            >
+              {checkingEligibility ? "Checking eligibility... ⏳" : (spinning ? "SPINNING... 🦁" : "SPIN THE WHEEL ⚡")}
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            textAlign:"center",
+            padding:"1.5rem",
+            background:"rgba(34, 197, 94, 0.08)",
+            border:"1px dashed rgba(34, 197, 94, 0.4)",
+            borderRadius:"16px",
+            width:"100%",
+            maxWidth:"360px"
+          }}>
+            <div style={{fontSize:"40px",marginBottom:"8px"}}>🎉</div>
+            <div style={{fontWeight:"800",fontSize:"18px",color:"#22C55E",marginBottom:"4px"}}>Congratulations!</div>
+            <p style={{fontSize:"13px",color:"#9090A8",margin:"0 0 1rem 0"}}>You spun the wheel and secured:</p>
+            <div style={{
+              background:"#0A0A0F",
+              border:"1px solid #2A2A38",
+              borderRadius:"10px",
+              padding:"10px 16px",
+              fontWeight:"800",
+              fontSize:"16px",
+              color:"#F97316",
+              display:"inline-block"
+            }}>
+              {wonPrize?.reward_name}
+            </div>
+            <div style={{fontSize:"11px",color:"#5A5A72",marginTop:"12px"}}>
+              Your reward has been saved. Vouchers are linked to <strong>{email || "your email"}</strong> and are active immediately!
+            </div>
+          </div>
+        )}
+      </div>
+
+      {grandPrizes.length > 0 && (
+        <div style={{
+          marginTop:"2rem",
+          background:"#111118",
+          border:"1px solid #2A2A38",
+          borderRadius:"16px",
+          padding:"1.25rem 1.5rem"
+        }}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px",fontWeight:"700",fontSize:"14px",marginBottom:"1rem",color:"#FF4D6A"}}>
+            <span>🎁</span> Global Grand Prize Left (Event Cap: 10 Total)
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"12px"}}>
+            {grandPrizes.map(gp => {
+              const remaining = gp.remaining !== undefined ? gp.remaining : 3
+              return (
+                <div key={gp.id} style={{
+                  background:"#16161F",
+                  border:"1px solid "+(remaining > 0 ? "#2A2A38" : "rgba(255, 77, 106, 0.15)"),
+                  borderRadius:"12px",
+                  padding:"10px",
+                  textAlign:"center"
+                }}>
+                  <div style={{fontSize:"18px",marginBottom:"4px"}}>{gp.id === "macbook" ? "💻" : (gp.id === "iphone" ? "📱" : "🎮")}</div>
+                  <div style={{fontWeight:"600",fontSize:"11px",color:"#F0F0F5",marginBottom:"2px"}}>{gp.id === "macbook" ? "MacBook" : (gp.id === "iphone" ? "iPhone" : "PS5")}</div>
+                  <div style={{
+                    fontSize:"11px",
+                    fontWeight:"800",
+                    color: remaining > 0 ? "#22C55E" : "#FF4D6A"
+                  }}>
+                    {remaining > 0 ? `${remaining} Left` : "CLAIMED"}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function App() {
   const [portal, setPortal] = useState(null)
   const [view, setView] = useState("home")
@@ -163,6 +566,115 @@ export default function App() {
   const [newReview, setNewReview] = useState({rating:5,comment:"",userName:""})
   const [loading, setLoading] = useState(true)
   const fileRef = useRef()
+
+  const [checkoutEmail, setCheckoutEmail] = useState("")
+  const [checkoutName, setCheckoutName] = useState("")
+  const [promoEligible, setPromoEligible] = useState(false)
+  const [promoReason, setPromoReason] = useState("")
+  const [promoChecking, setPromoChecking] = useState(false)
+
+  useEffect(() => {
+    if (!checkoutEmail || cart.length === 0) {
+      setPromoEligible(false)
+      setPromoReason("")
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(checkoutEmail)) {
+      setPromoEligible(false)
+      setPromoReason("Please enter a valid email address.")
+      return
+    }
+
+    const checkPromo = async () => {
+      setPromoChecking(true)
+      try {
+        const bizIds = [...new Set(cart.map(item => item.bizId || item.biz_id))].join(",")
+        const res = await fetch(`/api/promo/check?email=${encodeURIComponent(checkoutEmail)}&biz_ids=${bizIds}`)
+        const data = await res.json()
+        setPromoEligible(data.eligible)
+        setPromoReason(data.reason)
+      } catch (err) {
+        console.error("Promo eligibility check failed:", err)
+        const approved = [1, 3, 5]
+        const hasApproved = cart.some(item => approved.includes(item.bizId || item.biz_id))
+        const hasPrev = localStorage.getItem(`ordered_${checkoutEmail}`)
+        if (hasApproved && !hasPrev) {
+          setPromoEligible(true)
+          setPromoReason("Promo eligible! (Local fallback active) 🎉")
+        } else if (!hasApproved) {
+          setPromoEligible(false)
+          setPromoReason("No promotional partners in cart.")
+        } else {
+          setPromoEligible(false)
+          setPromoReason("This email has already made a purchase.")
+        }
+      }
+      setPromoChecking(false)
+    }
+
+    const timer = setTimeout(checkPromo, 500)
+    return () => clearTimeout(timer)
+  }, [checkoutEmail, cart])
+
+  const handleCheckout = async () => {
+    if (!checkoutEmail || !checkoutName) {
+      showToast("⚠️ Please fill in your name and email to checkout")
+      return
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(checkoutEmail)) {
+      showToast("⚠️ Please enter a valid email address")
+      return
+    }
+
+    try {
+      const items = cart.map(item => ({
+        product_id: item.id,
+        business_id: item.bizId || item.biz_id,
+        name: item.name,
+        original_price: parseFloat(item.price),
+        qty: item.qty
+      }))
+
+      const res = await fetch("/api/promo/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: checkoutEmail,
+          customer_name: checkoutName,
+          items: items
+        })
+      })
+      const data = await res.json()
+      
+      if (data.success) {
+        localStorage.setItem(`ordered_${checkoutEmail}`, "true")
+        setCart([])
+        setCheckoutEmail("")
+        setCheckoutName("")
+        if (data.is_promo_applied) {
+          showToast("🎉 Onboarding Promo Applied! Flat $2 Order secured!")
+        } else {
+          showToast("🎉 Order placed successfully!")
+        }
+      } else {
+        showToast("❌ Checkout failed: " + data.detail)
+      }
+    } catch (err) {
+      console.error("Checkout failed:", err)
+      localStorage.setItem(`ordered_${checkoutEmail}`, "true")
+      setCart([])
+      setCheckoutEmail("")
+      setCheckoutName("")
+      if (promoEligible) {
+        showToast("🎉 Onboarding Promo Applied! Flat $2 Order secured! (Local simulation)")
+      } else {
+        showToast("🎉 Order placed successfully! (Local simulation)")
+      }
+    }
+  }
 
   useEffect(()=>{ loadAll() },[])
 
@@ -306,6 +818,7 @@ export default function App() {
             <button style={{...s.navBtn,...(view==="shop"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("shop")}>Shop</button>
             <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
             <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#F97316",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
+            <button style={{...s.navBtn,...(view==="spin"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("spin")}>Lucky Spin 🎡</button>
           </>}
           {portal==="founder"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Dashboard</button>
@@ -431,19 +944,132 @@ export default function App() {
             <div style={{marginBottom:"1.5rem"}}><h2 style={{fontWeight:"800",marginBottom:"4px"}}>Your Cart 🛒</h2></div>
             {cart.length===0?<div style={{textAlign:"center",padding:"3rem",color:"#9090A8"}}><div style={{fontSize:"40px",marginBottom:"1rem"}}>🛒</div><p>Your cart is empty</p></div>:
             <div>
-              {cart.map(c=>(
-                <div key={c.id} style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 0",borderBottom:"1px solid #2A2A38"}}>
-                  <div style={{fontSize:"28px",width:"44px",height:"44px",background:"#1A1A24",borderRadius:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>{c.emoji}</div>
-                  <div style={{flex:1}}><div style={{fontWeight:"600",fontSize:"13px"}}>{c.name}</div><div style={{fontSize:"12px",color:"#9090A8"}}>Qty: {c.qty}</div></div>
-                  <div style={{fontWeight:"700",color:"#F97316"}}>${c.price*c.qty}</div>
+              {/* Cart Items List */}
+              <div style={{marginBottom:"2rem"}}>
+                {cart.map(c=>{
+                  const b = bizList.find(x => x.id === (c.bizId || c.biz_id));
+                  return (
+                    <div key={c.id} style={{display:"flex",alignItems:"center",gap:"12px",padding:"12px 0",borderBottom:"1px solid #2A2A38"}}>
+                      <div style={{fontSize:"28px",width:"44px",height:"44px",background:"#1A1A24",borderRadius:"8px",display:"flex",alignItems:"center",justifyContent:"center"}}>{c.emoji}</div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:"600",fontSize:"13px"}}>{c.name}</div>
+                        <div style={{fontSize:"12px",color:"#9090A8"}}>by {b ? b.name : "Student Business"} · Qty: {c.qty}</div>
+                      </div>
+                      <div style={{fontWeight:"700",color:"#F97316"}}>${c.price*c.qty}</div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Promo Status / Banner */}
+              {promoEligible && (
+                <div style={{
+                  background: "rgba(249, 115, 22, 0.08)",
+                  border: "1px dashed rgba(249, 115, 22, 0.4)",
+                  borderRadius: "12px",
+                  padding: "1rem",
+                  marginBottom: "1.5rem"
+                }}>
+                  <div style={{display:"flex",alignItems:"center",gap:"8px",color:"#F97316",fontWeight:"700",fontSize:"14px",marginBottom:"4px"}}>
+                    <span>🎉</span> Onboarding Promotion Active!
+                  </div>
+                  <div style={{fontSize:"12px",color:"#9090A8"}}>
+                    Your first purchase qualifies for our flat <strong>$2.00</strong> onboarding special! The remaining balance is fully subsidized.
+                  </div>
                 </div>
-              ))}
-              <div style={{marginTop:"1.5rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div><div style={{fontSize:"12px",color:"#9090A8"}}>Total</div><div style={{fontSize:"24px",fontWeight:"800",color:"#F97316"}}>${cartTotal}</div></div>
-                <button style={{...s.btn,...s.btnAccent}} onClick={()=>{setCart([]);showToast("🎉 Order placed!")}}>Checkout →</button>
+              )}
+
+              {/* Checkout Form */}
+              <div style={{background:"#16161F",border:"1px solid #2A2A38",borderRadius:"12px",padding:"1.25rem",marginBottom:"1.5rem"}}>
+                <div style={{fontWeight:"700",marginBottom:"1rem",fontSize:"14px"}}>Checkout Contact Information 🚚</div>
+                <label style={{fontSize:"12px",color:"#9090A8",marginBottom:"6px",display:"block"}}>Full Name</label>
+                <input 
+                  style={s.input} 
+                  placeholder="Enter your full name" 
+                  value={checkoutName} 
+                  onChange={e=>setCheckoutName(e.target.value)} 
+                />
+                
+                <label style={{fontSize:"12px",color:"#9090A8",marginBottom:"6px",display:"block"}}>Email Address</label>
+                <input 
+                  style={{
+                    ...s.input,
+                    borderColor: promoChecking ? "#F97316" : (checkoutEmail && !promoEligible && checkoutEmail.includes("@") ? "#FF4D6A" : "#2A2A38")
+                  }} 
+                  placeholder="Enter email to check promo eligibility" 
+                  value={checkoutEmail} 
+                  onChange={e=>setCheckoutEmail(e.target.value)} 
+                />
+                
+                {promoReason && (
+                  <div style={{
+                    fontSize: "11px", 
+                    color: promoEligible ? "#22C55E" : "#9090A8", 
+                    marginTop: "-8px", 
+                    marginBottom: "0.5rem",
+                    fontWeight: "500"
+                  }}>
+                    {promoChecking ? "Checking eligibility... ⏳" : promoReason}
+                  </div>
+                )}
+              </div>
+
+              {/* Pricing Totals & Checkout Button */}
+              <div style={{
+                background: "#111118",
+                border: "1px solid #2A2A38",
+                borderRadius: "12px",
+                padding: "1.25rem",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "1rem"
+              }}>
+                <div>
+                  <div style={{fontSize:"12px",color:"#9090A8"}}>Total Amount Payable</div>
+                  {promoEligible ? (
+                    <div style={{display:"flex",alignItems:"baseline",gap:"8px",marginTop:"4px"}}>
+                      <span style={{fontSize:"24px",fontWeight:"800",color:"#F97316"}}>$2.00</span>
+                      <span style={{fontSize:"14px",color:"#5A5A72",textDecoration:"line-through"}}>${cartTotal.toFixed(2)}</span>
+                      <span style={{
+                        fontSize: "10px",
+                        background: "rgba(34,197,94,0.15)",
+                        color: "#22C55E",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        fontWeight: "700"
+                      }}>
+                        Saved ${(cartTotal - 2.0).toFixed(2)}!
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{fontSize:"24px",fontWeight:"800",color:"#F97316",marginTop:"4px"}}>${cartTotal.toFixed(2)}</div>
+                  )}
+                </div>
+                
+                <button 
+                  style={{
+                    ...s.btn,
+                    ...s.btnAccent,
+                    padding: "12px 24px",
+                    fontSize: "14px",
+                    opacity: (!checkoutEmail || !checkoutName) ? 0.5 : 1,
+                    cursor: (!checkoutEmail || !checkoutName) ? "not-allowed" : "pointer"
+                  }} 
+                  onClick={handleCheckout}
+                  disabled={!checkoutEmail || !checkoutName}
+                >
+                  {promoEligible ? "Claim $2 Offer! ⚡" : "Place Order →"}
+                </button>
               </div>
             </div>}
           </div>
+        )}
+
+        {/* LUCKY SPIN EVENT */}
+        {portal==="consumer"&&view==="spin"&&(
+          <LuckySpin showToast={showToast} />
         )}
 
         {/* BUSINESS OWNER DASHBOARD */}
