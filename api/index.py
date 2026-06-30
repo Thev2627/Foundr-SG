@@ -33,6 +33,205 @@ supabase_client: Client = create_client(SUPABASE_URL, SUPABASE_ANON_KEY)
 # 1 = Crème by Clara, 3 = Stitch & Soul, 5 = GlowLab SG
 PROMO_ELIGIBLE_BIZ_IDS = {1, 3, 5}
 
+# ==========================================
+# LEOCASH WALLET & REFERRAL CORE HELPERS
+# ==========================================
+import json
+import random
+import string
+import threading
+from datetime import datetime
+
+wallet_lock = threading.Lock()
+WALLET_STATE_FILE = os.path.join(os.path.dirname(__file__), "wallet_state.json")
+
+BIZ_OWNER_EMAILS = {
+    1: "clara@student.nus.edu.sg",
+    2: "marcus@student.ntu.edu.sg",
+    3: "priya@student.smu.edu.sg",
+    4: "alvin@student.ntu.edu.sg",
+    5: "sophie@student.nus.edu.sg"
+}
+
+def load_wallet_state():
+    with wallet_lock:
+        if not os.path.exists(WALLET_STATE_FILE):
+            default_state = {
+                "wallets": {
+                    "clara@student.nus.edu.sg": 1200,
+                    "student@student.edu.sg": 600
+                },
+                "transactions": {
+                    "clara@student.nus.edu.sg": [
+                        {
+                            "amount": 1000,
+                            "type": "credit",
+                            "description": "First completed sale bonus",
+                            "created_at": datetime.now().isoformat()
+                        },
+                        {
+                            "amount": 200,
+                            "type": "credit",
+                            "description": "First product listing bonus",
+                            "created_at": datetime.now().isoformat()
+                        }
+                    ],
+                    "student@student.edu.sg": [
+                        {
+                            "amount": 500,
+                            "type": "credit",
+                            "description": "Referral welcome bonus",
+                            "created_at": datetime.now().isoformat()
+                        },
+                        {
+                            "amount": 100,
+                            "type": "credit",
+                            "description": "Lucky Spin Reward (100 LeoCoins)",
+                            "created_at": datetime.now().isoformat()
+                        }
+                    ]
+                },
+                "referrals": {
+                    "LEO-CLAR": "clara@student.nus.edu.sg",
+                    "LEO-STUD": "student@student.edu.sg"
+                },
+                "user_referral_codes": {
+                    "clara@student.nus.edu.sg": "LEO-CLAR",
+                    "student@student.edu.sg": "LEO-STUD"
+                },
+                "claimed_referral_emails": ["student@student.edu.sg"]
+            }
+            try:
+                with open(WALLET_STATE_FILE, "w") as f:
+                    json.dump(default_state, f, indent=2)
+            except Exception as e:
+                print(f"Failed to create local wallet state file: {e}")
+            return default_state
+        try:
+            with open(WALLET_STATE_FILE, "r") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Failed to read local wallet state file: {e}")
+            return {
+                "wallets": {
+                    "clara@student.nus.edu.sg": 1200,
+                    "student@student.edu.sg": 600
+                },
+                "transactions": {
+                    "clara@student.nus.edu.sg": [
+                        {
+                            "amount": 1000,
+                            "type": "credit",
+                            "description": "First completed sale bonus",
+                            "created_at": datetime.now().isoformat()
+                        },
+                        {
+                            "amount": 200,
+                            "type": "credit",
+                            "description": "First product listing bonus",
+                            "created_at": datetime.now().isoformat()
+                        }
+                    ],
+                    "student@student.edu.sg": [
+                        {
+                            "amount": 500,
+                            "type": "credit",
+                            "description": "Referral welcome bonus",
+                            "created_at": datetime.now().isoformat()
+                        },
+                        {
+                            "amount": 100,
+                            "type": "credit",
+                            "description": "Lucky Spin Reward (100 LeoCoins)",
+                            "created_at": datetime.now().isoformat()
+                        }
+                    ]
+                },
+                "referrals": {
+                    "LEO-CLAR": "clara@student.nus.edu.sg",
+                    "LEO-STUD": "student@student.edu.sg"
+                },
+                "user_referral_codes": {
+                    "clara@student.nus.edu.sg": "LEO-CLAR",
+                    "student@student.edu.sg": "LEO-STUD"
+                },
+                "claimed_referral_emails": ["student@student.edu.sg"]
+            }
+
+def save_wallet_state(state):
+    with wallet_lock:
+        try:
+            with open(WALLET_STATE_FILE, "w") as f:
+                json.dump(state, f, indent=2)
+            return True
+        except Exception as e:
+            print(f"Failed to save local wallet state: {e}")
+            return False
+
+def record_transaction(email: str, amount: int, tx_type: str, description: str):
+    email_clean = email.strip().lower()
+    
+    # 1. Best-effort Supabase insert
+    try:
+        res = supabase_client.table("wallets").select("balance").eq("email", email_clean).execute()
+        if res.data:
+            current_balance = res.data[0]["balance"]
+            new_balance = max(0, current_balance + amount)
+            supabase_client.table("wallets").update({"balance": new_balance}).eq("email", email_clean).execute()
+        else:
+            new_balance = max(0, amount)
+            supabase_client.table("wallets").insert({"email": email_clean, "balance": new_balance}).execute()
+            
+        supabase_client.table("wallet_transactions").insert({
+            "email": email_clean,
+            "amount": amount,
+            "type": tx_type,
+            "description": description
+        }).execute()
+    except Exception as e:
+        print(f"Supabase transaction log error: {e}")
+        
+    # 2. Local JSON file syncing
+    state = load_wallet_state()
+    current_bal = state["wallets"].get(email_clean, 0)
+    state["wallets"][email_clean] = max(0, current_bal + amount)
+    
+    if email_clean not in state["transactions"]:
+        state["transactions"][email_clean] = []
+        
+    tx_log = {
+        "amount": amount,
+        "type": tx_type,
+        "description": description,
+        "created_at": datetime.now().isoformat()
+    }
+    state["transactions"][email_clean].insert(0, tx_log)
+    save_wallet_state(state)
+    return state["wallets"][email_clean]
+
+def generate_unique_code(email: str, state) -> str:
+    email_clean = email.strip().lower()
+    if email_clean in state["user_referral_codes"]:
+        return state["user_referral_codes"][email_clean]
+        
+    while True:
+        code_chars = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        code = f"LEO-{code_chars}"
+        if code not in state["referrals"]:
+            break
+            
+    state["user_referral_codes"][email_clean] = code
+    state["referrals"][code] = email_clean
+    save_wallet_state(state)
+    
+    try:
+        supabase_client.table("referral_codes").insert({"email": email_clean, "code": code}).execute()
+    except Exception:
+        pass
+        
+    return code
+
+
 class CartItem(BaseModel):
     product_id: int
     business_id: int
@@ -182,6 +381,32 @@ def process_checkout(req: CheckoutRequest):
             orders_inserted.append(mock_inserted)
 
     final_total = 2.0 if (is_promo_eligible and promo_applied_to_order) else original_total
+
+    # 3. Wallet Rewards integration
+    # Consumer cashback (10 LeoCoins per $1 spent)
+    coins_earned = int(final_total * 10)
+    if coins_earned > 0:
+        record_transaction(email_clean, coins_earned, "credit", f"Cashback for purchase of ${final_total:.2f}")
+
+    # Business owner first sale bonus (+1000 LeoCoins)
+    unique_biz_ids = {item.business_id for item in req.items}
+    for biz_id in unique_biz_ids:
+        owner_email = BIZ_OWNER_EMAILS.get(biz_id)
+        if owner_email:
+            has_prior_sales = False
+            try:
+                res_sales = supabase_client.table("orders").select("id").eq("business_id", biz_id).execute()
+                inserted_ids = {o.get("id") for o in orders_inserted if o.get("id") is not None}
+                prior_sales = [o for o in res_sales.data if o.get("id") not in inserted_ids]
+                has_prior_sales = len(prior_sales) > 0
+            except Exception:
+                # Local fallback check
+                wallet_state = load_wallet_state()
+                txs = wallet_state["transactions"].get(owner_email, [])
+                has_prior_sales = any(tx["description"] == "First completed sale bonus" for tx in txs)
+                
+            if not has_prior_sales:
+                record_transaction(owner_email, 1000, "credit", "First completed sale bonus")
 
     return {
         "success": True,
@@ -365,6 +590,14 @@ def spin_wheel(req: SpinRequest):
             state["grand_prizes"][reward_id]["claimed_count"] += 1
             
     save_local_spin_state(state)
+
+    # Credit coins if won
+    if reward_id == "leo_coins_100":
+        record_transaction(email_clean, 100, "credit", "Lucky Spin Reward (100 LeoCoins)")
+    elif reward_id == "leo_coins_500":
+        record_transaction(email_clean, 500, "credit", "Lucky Spin Reward (500 LeoCoins)")
+    elif reward_id == "leo_coins_5000":
+        record_transaction(email_clean, 5000, "credit", "Lucky Spin Reward (5000 LeoCoins)")
     
     # Attempt to write to Supabase (best-effort)
     try:
@@ -393,4 +626,172 @@ def spin_wheel(req: SpinRequest):
         "reward_color": rolled_reward["color"],
         "reward_type": rolled_reward["type"]
     }
+
+
+# ==========================================
+# LEOCASH WALLET & REFERRAL SYSTEM ENDPOINTS
+# ==========================================
+
+@app.get("/api/wallet/balance")
+def get_wallet_balance(email: str = Query(..., description="Customer email address")):
+    email_clean = email.strip().lower()
+    if not email_clean or not is_valid_email(email_clean):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+        
+    state = load_wallet_state()
+    balance = state["wallets"].get(email_clean, 0)
+    transactions = state["transactions"].get(email_clean, [])
+    
+    # Best-effort Supabase fetch
+    try:
+        res = supabase_client.table("wallets").select("balance").eq("email", email_clean).execute()
+        if res.data:
+            balance = res.data[0]["balance"]
+            
+        tx_res = supabase_client.table("wallet_transactions").select("*").eq("email", email_clean).order("created_at", desc=True).execute()
+        if tx_res.data:
+            transactions = []
+            for tx in tx_res.data:
+                transactions.append({
+                    "amount": tx["amount"],
+                    "type": tx["type"],
+                    "description": tx["description"],
+                    "created_at": tx.get("created_at") or datetime.now().isoformat()
+                })
+    except Exception as e:
+        print(f"Supabase wallet read failed: {e}")
+        
+    return {
+        "success": True,
+        "email": email_clean,
+        "balance": balance,
+        "transactions": transactions
+    }
+
+@app.get("/api/referral/code")
+def get_referral_code(email: str = Query(..., description="Customer email address")):
+    email_clean = email.strip().lower()
+    if not email_clean or not is_valid_email(email_clean):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+        
+    state = load_wallet_state()
+    code = None
+    
+    # Best-effort Supabase fetch
+    try:
+        res = supabase_client.table("referral_codes").select("code").eq("email", email_clean).execute()
+        if res.data:
+            code = res.data[0]["code"]
+    except Exception as e:
+        print(f"Supabase referral check failed: {e}")
+        
+    if not code:
+        code = generate_unique_code(email_clean, state)
+        
+    return {
+        "success": True,
+        "code": code
+    }
+
+class ReferralClaimRequest(BaseModel):
+    email: str
+    code: str
+
+@app.post("/api/referral/claim")
+def claim_referral(req: ReferralClaimRequest):
+    email_clean = req.email.strip().lower()
+    code_clean = req.code.strip().upper()
+    
+    if not email_clean or not is_valid_email(email_clean):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+        
+    state = load_wallet_state()
+    
+    # 1. Prevent self-referral
+    user_code = state["user_referral_codes"].get(email_clean)
+    if user_code and user_code.upper() == code_clean:
+        raise HTTPException(status_code=400, detail="You cannot redeem your own referral code!")
+        
+    # 2. Check if user already claimed a code
+    already_claimed = email_clean in state.get("claimed_referral_emails", [])
+    try:
+        res = supabase_client.table("wallet_transactions").select("id").eq("email", email_clean).eq("description", "Referral welcome bonus").execute()
+        if len(res.data) > 0:
+            already_claimed = True
+    except Exception:
+        pass
+        
+    if already_claimed:
+        raise HTTPException(status_code=400, detail="You have already claimed a referral code!")
+        
+    # 3. Find the referrer
+    referrer_email = None
+    if code_clean in state["referrals"]:
+        referrer_email = state["referrals"][code_clean]
+    else:
+        try:
+            res = supabase_client.table("referral_codes").select("email").eq("code", code_clean).execute()
+            if res.data:
+                referrer_email = res.data[0]["email"]
+        except Exception:
+            pass
+            
+    if not referrer_email:
+        raise HTTPException(status_code=404, detail="Invalid referral code. Please check and try again.")
+        
+    if referrer_email == email_clean:
+        raise HTTPException(status_code=400, detail="You cannot redeem your own referral code!")
+        
+    # 4. Award the welcome and reward coins
+    referee_bal = record_transaction(email_clean, 500, "credit", "Referral welcome bonus")
+    record_transaction(referrer_email, 500, "credit", f"Referral reward for inviting {email_clean}")
+    
+    if email_clean not in state["claimed_referral_emails"]:
+        state["claimed_referral_emails"].append(email_clean)
+    save_wallet_state(state)
+    
+    try:
+        supabase_client.table("referrals").insert({
+            "referrer_email": referrer_email,
+            "referee_email": email_clean,
+            "referral_code": code_clean,
+            "status": "completed"
+        }).execute()
+    except Exception:
+        pass
+        
+    return {
+        "success": True,
+        "referee_balance": referee_bal,
+        "message": f"Referral code claimed! You and {referrer_email} both received 500 LeoCoins! 🪙"
+    }
+
+class EarnListingRequest(BaseModel):
+    email: str
+    business_id: int
+
+@app.post("/api/wallet/earn-listing")
+def earn_listing(req: EarnListingRequest):
+    email_clean = req.email.strip().lower()
+    
+    # Verify business ownership
+    mapped_email = BIZ_OWNER_EMAILS.get(req.business_id)
+    if not mapped_email or mapped_email != email_clean:
+        raise HTTPException(status_code=400, detail="Unauthorized business mapping")
+        
+    # Check if they have already claimed product listing reward
+    state = load_wallet_state()
+    txs = state["transactions"].get(email_clean, [])
+    already_rewarded = any("First product listing bonus" in tx["description"] for tx in txs)
+    
+    if already_rewarded:
+        return {"success": False, "reason": "Already rewarded for first product listing"}
+        
+    new_bal = record_transaction(email_clean, 200, "credit", "First product listing bonus")
+    return {
+        "success": True,
+        "balance": new_bal,
+        "message": "Congratulations! You earned 200 LeoCoins for listing your first product! 🪙"
+    }
+
 

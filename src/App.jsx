@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react"
 import { createClient } from "@supabase/supabase-js"
+import Login from "./Login"
 
 const supabase = createClient(
   "https://jhyblauvdqvatqvcqetu.supabase.co",
@@ -153,19 +154,50 @@ const FALLBACK_REWARDS = [
   {"id": "ps5", "name": "PlayStation 5 🎮", "color": "#6366F1", "type": "grand", "remaining": 4, "max_cap": 4}
 ];
 
-function LuckySpin({ showToast }) {
-  const [email, setEmail] = useState("")
+function LuckySpin({ showToast, userEmail, onSpinCompleted }) {
   const [rewards, setRewards] = useState([])
   const [loading, setLoading] = useState(true)
   const [spinning, setSpinning] = useState(false)
-  const [hasSpun, setHasSpun] = useState(false)
+  const [hasSpunToday, setHasSpunToday] = useState(false)
   const [wonPrize, setWonPrize] = useState(null)
   const [errorMessage, setErrorMessage] = useState("")
   const [checkingEligibility, setCheckingEligibility] = useState(false)
-  
+  const [countdown, setCountdown] = useState("")
+  const [showConfetti, setShowConfetti] = useState(false)
+
   const canvasRef = useRef(null)
   const angleRef = useRef(0)
   const animationRef = useRef(null)
+  const countdownRef = useRef(null)
+
+  // Daily spin key: per-user per-day
+  const todayStr = () => new Date().toISOString().slice(0, 10) // YYYY-MM-DD
+  const spinKey = () => `lucky_spin_${userEmail}_${todayStr()}`
+  const spinResultKey = () => `lucky_spin_result_${userEmail}_${todayStr()}`
+
+  const startCountdown = () => {
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    const tick = () => {
+      const now = new Date()
+      const tomorrow = new Date(now)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+      const diff = tomorrow - now
+      if (diff <= 0) {
+        clearInterval(countdownRef.current)
+        setHasSpunToday(false)
+        setWonPrize(null)
+        setCountdown("")
+        return
+      }
+      const h = String(Math.floor(diff / 3600000)).padStart(2, "0")
+      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, "0")
+      const sec = String(Math.floor((diff % 60000) / 1000)).padStart(2, "0")
+      setCountdown(`${h}:${m}:${sec}`)
+    }
+    tick()
+    countdownRef.current = setInterval(tick, 1000)
+  }
 
   const fetchRewards = async () => {
     setLoading(true)
@@ -178,7 +210,6 @@ function LuckySpin({ showToast }) {
         setRewards(FALLBACK_REWARDS)
       }
     } catch (err) {
-      console.error("Failed to fetch rewards from backend, loading fallback config:", err)
       setRewards(FALLBACK_REWARDS)
     }
     setLoading(false)
@@ -186,14 +217,15 @@ function LuckySpin({ showToast }) {
 
   useEffect(() => {
     fetchRewards()
-    const localSpun = localStorage.getItem("lucky_spin_completed")
-    if (localSpun) {
-      setHasSpun(true)
-      try {
-        setWonPrize(JSON.parse(localSpun))
-      } catch(e){}
+    // Check if already spun today
+    const alreadySpun = localStorage.getItem(spinKey())
+    if (alreadySpun) {
+      setHasSpunToday(true)
+      try { setWonPrize(JSON.parse(localStorage.getItem(spinResultKey()))) } catch(e){}
+      startCountdown()
     }
-  }, [])
+    return () => { if (countdownRef.current) clearInterval(countdownRef.current) }
+  }, [userEmail])
 
   useEffect(() => {
     if (rewards.length === 0 || loading) return
@@ -208,85 +240,105 @@ function LuckySpin({ showToast }) {
     const height = canvas.height
     const centerX = width / 2
     const centerY = height / 2
-    const radius = Math.min(centerX, centerY) - 15
+    const radius = Math.min(centerX, centerY) - 18
     const numSectors = rewards.length
     const arcSize = (2 * Math.PI) / numSectors
 
     ctx.clearRect(0, 0, width, height)
 
+    // Outer glow ring
     ctx.save()
     ctx.beginPath()
-    ctx.arc(centerX, centerY, radius + 8, 0, 2 * Math.PI)
-    ctx.fillStyle = "#111118"
-    ctx.shadowColor = "#F97316"
-    ctx.shadowBlur = spinning ? 20 : 10
+    ctx.arc(centerX, centerY, radius + 14, 0, 2 * Math.PI)
+    const glowGrad = ctx.createRadialGradient(centerX, centerY, radius, centerX, centerY, radius + 14)
+    glowGrad.addColorStop(0, spinning ? "rgba(249,115,22,0.6)" : "rgba(249,115,22,0.25)")
+    glowGrad.addColorStop(1, "transparent")
+    ctx.fillStyle = glowGrad
     ctx.fill()
     ctx.restore()
 
+    // Outer dark backing disc
+    ctx.save()
+    ctx.beginPath()
+    ctx.arc(centerX, centerY, radius + 4, 0, 2 * Math.PI)
+    ctx.fillStyle = "#111118"
+    ctx.shadowColor = "#F97316"
+    ctx.shadowBlur = spinning ? 28 : 12
+    ctx.fill()
+    ctx.restore()
+
+    // Sectors
     for (let i = 0; i < numSectors; i++) {
       const sectorAngle = angle + i * arcSize
       ctx.beginPath()
       ctx.moveTo(centerX, centerY)
       ctx.arc(centerX, centerY, radius, sectorAngle, sectorAngle + arcSize)
       ctx.closePath()
-
       ctx.fillStyle = rewards[i].color || "#2A2A38"
       ctx.fill()
-
-      ctx.strokeStyle = "#0A0A0F"
+      ctx.strokeStyle = "rgba(0,0,0,0.45)"
       ctx.lineWidth = 2
       ctx.stroke()
 
+      // Label
       ctx.save()
       ctx.translate(centerX, centerY)
       ctx.rotate(sectorAngle + arcSize / 2)
       ctx.textAlign = "right"
       ctx.textBaseline = "middle"
-      ctx.fillStyle = "#F0F0F5"
-      ctx.font = "bold 11px sans-serif"
-      
+
+      // Text shadow
+      ctx.shadowColor = "rgba(0,0,0,0.8)"
+      ctx.shadowBlur = 4
+      ctx.fillStyle = "#FFFFFF"
+      ctx.font = "bold 10px 'Segoe UI', sans-serif"
       let displayName = rewards[i].name
-      if (displayName.length > 18) {
-        displayName = displayName.substring(0, 15) + "..."
-      }
-      ctx.fillText(displayName, radius - 20, 0)
+      if (displayName.length > 16) displayName = displayName.substring(0, 14) + "…"
+      ctx.fillText(displayName, radius - 18, 0)
       ctx.restore()
     }
 
+    // Center hub
+    const hubGrad = ctx.createRadialGradient(centerX - 6, centerY - 6, 2, centerX, centerY, 34)
+    hubGrad.addColorStop(0, "#2A2A38")
+    hubGrad.addColorStop(1, "#111118")
     ctx.beginPath()
-    ctx.arc(centerX, centerY, 35, 0, 2 * Math.PI)
-    ctx.fillStyle = "#16161F"
+    ctx.arc(centerX, centerY, 34, 0, 2 * Math.PI)
+    ctx.fillStyle = hubGrad
     ctx.strokeStyle = "#F97316"
     ctx.lineWidth = 3
-    ctx.shadowColor = "#000"
-    ctx.shadowBlur = 5
+    ctx.shadowColor = "#F97316"
+    ctx.shadowBlur = 8
     ctx.fill()
     ctx.stroke()
+    ctx.shadowBlur = 0
 
-    ctx.fillStyle = "#F0F0F5"
-    ctx.font = "900 13px sans-serif"
+    ctx.font = "22px serif"
     ctx.textAlign = "center"
     ctx.textBaseline = "middle"
     ctx.fillText("🦁", centerX, centerY)
 
+    // Decorative studs around rim
     ctx.save()
     ctx.translate(centerX, centerY)
-    for (let j = 0; j < 24; j++) {
-      ctx.rotate((2 * Math.PI) / 24)
+    const numStuds = 32
+    for (let j = 0; j < numStuds; j++) {
+      ctx.rotate((2 * Math.PI) / numStuds)
       ctx.beginPath()
-      ctx.arc(radius + 3, 0, j % 2 === 0 ? 3 : 2, 0, 2 * Math.PI)
-      ctx.fillStyle = (spinning && (Math.floor(angle * 5) + j) % 2 === 0) ? "#FFF" : "#F97316"
+      ctx.arc(radius + 4, 0, j % 2 === 0 ? 3.5 : 2, 0, 2 * Math.PI)
+      const lit = spinning && (Math.floor(angle * 6) + j) % 2 === 0
+      ctx.fillStyle = lit ? "#FFFFFF" : "#F97316"
+      ctx.shadowColor = lit ? "#FFF" : "#F97316"
+      ctx.shadowBlur = lit ? 6 : 3
       ctx.fill()
     }
     ctx.restore()
   }
 
   const handleSpinClick = async () => {
-    if (spinning || hasSpun) return
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(email)) {
-      setErrorMessage("⚠️ Please enter a valid email address first.")
+    if (spinning || hasSpunToday) return
+    if (!userEmail) {
+      setErrorMessage("⚠️ You must be logged in to spin.")
       return
     }
 
@@ -298,7 +350,7 @@ function LuckySpin({ showToast }) {
       const res = await fetch("/api/lucky-spin/spin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email })
+        body: JSON.stringify({ email: userEmail })
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
@@ -308,24 +360,30 @@ function LuckySpin({ showToast }) {
       }
       spinResult = data
     } catch (err) {
-      console.error("Lucky spin backend failed, running secure local roll simulation:", err)
-      const localCompleted = localStorage.getItem(`lucky_spun_${email}`)
-      if (localCompleted) {
-        setErrorMessage("❌ This email has already spun the wheel! (Simulated)")
+      console.error("Lucky spin backend unavailable, running local simulation:", err)
+      // Local daily-gate check
+      const localDone = localStorage.getItem(spinKey())
+      if (localDone) {
+        setErrorMessage("❌ You've already spun today! Come back tomorrow.")
         setCheckingEligibility(false)
         return
       }
-      
-      const weights = FALLBACK_REWARDS.map(r => r.id === "macbook" || r.id === "iphone" ? 0.0003 : (r.id === "ps5" ? 0.0004 : (r.id === "voucher_50" ? 0.04 : (r.id === "leo_coins_5000" ? 0.01 : (r.id === "voucher_5" ? 0.099 : (r.id === "voucher_2" ? 0.15 : (r.id === "leo_coins_500" ? 0.30 : 0.40)))))))
+
+      const weights = FALLBACK_REWARDS.map(r =>
+        r.id === "macbook" || r.id === "iphone" ? 0.0003 :
+        r.id === "ps5" ? 0.0004 :
+        r.id === "voucher_50" ? 0.04 :
+        r.id === "leo_coins_5000" ? 0.01 :
+        r.id === "voucher_5" ? 0.099 :
+        r.id === "voucher_2" ? 0.15 :
+        r.id === "leo_coins_500" ? 0.30 : 0.40
+      )
       const rVal = Math.random()
       let cumulative = 0
       let selectedIdx = 0
       for (let i = 0; i < FALLBACK_REWARDS.length; i++) {
         cumulative += weights[i]
-        if (rVal <= cumulative) {
-          selectedIdx = i
-          break
-        }
+        if (rVal <= cumulative) { selectedIdx = i; break }
       }
       const rolled = FALLBACK_REWARDS[selectedIdx]
       spinResult = {
@@ -336,7 +394,7 @@ function LuckySpin({ showToast }) {
         reward_color: rolled.color,
         reward_type: rolled.type
       }
-      localStorage.setItem(`lucky_spun_${email}`, "true")
+      localStorage.setItem(spinKey(), "true")
     }
 
     setCheckingEligibility(false)
@@ -345,22 +403,19 @@ function LuckySpin({ showToast }) {
     const numSectors = rewards.length || FALLBACK_REWARDS.length
     const arcSize = (2 * Math.PI) / numSectors
     const winningIndex = spinResult.reward_index
-
-    const randomOffset = (Math.random() - 0.5) * 0.6 * arcSize
-    const rotations = 6
+    const randomOffset = (Math.random() - 0.5) * 0.55 * arcSize
+    const rotations = 7 + Math.floor(Math.random() * 3)
     const startAngle = angleRef.current % (2 * Math.PI)
-    const targetAngle = (rotations * 2 * Math.PI) + (1.5 * Math.PI) - ((winningIndex + 0.5) * arcSize) + randomOffset
+    const targetAngle = rotations * 2 * Math.PI + 1.5 * Math.PI - (winningIndex + 0.5) * arcSize + randomOffset
 
-    const duration = 6000
+    const duration = 6500
     const startTime = performance.now()
-    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3)
+    const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4)
 
     const animateWheel = (now) => {
       const elapsed = now - startTime
       const progress = Math.min(elapsed / duration, 1)
-      const easedProgress = easeOutCubic(progress)
-      
-      const currentAngle = startAngle + easedProgress * (targetAngle - startAngle)
+      const currentAngle = startAngle + easeOutQuart(progress) * (targetAngle - startAngle)
       angleRef.current = currentAngle
       drawWheel(currentAngle)
 
@@ -368,141 +423,191 @@ function LuckySpin({ showToast }) {
         animationRef.current = requestAnimationFrame(animateWheel)
       } else {
         setSpinning(false)
-        setHasSpun(true)
+        setHasSpunToday(true)
         setWonPrize(spinResult)
-        
-        localStorage.setItem("lucky_spin_completed", JSON.stringify(spinResult))
-        showToast(`🎉 Congratulations! You won: ${spinResult.reward_name}`)
+        setShowConfetti(true)
+        setTimeout(() => setShowConfetti(false), 3000)
+
+        // Save result for today
+        localStorage.setItem(spinKey(), "true")
+        localStorage.setItem(spinResultKey(), JSON.stringify(spinResult))
+
+        showToast(`🎉 You won: ${spinResult.reward_name}!`)
         fetchRewards()
+        startCountdown()
+
+        // Trigger wallet refresh in parent
+        if (onSpinCompleted) onSpinCompleted(userEmail)
       }
     }
-
     animationRef.current = requestAnimationFrame(animateWheel)
   }
-
-  const renderPointer = () => (
-    <div style={{
-      position: "absolute",
-      top: "-10px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      width: 0,
-      height: 0,
-      borderLeft: "14px solid transparent",
-      borderRight: "14px solid transparent",
-      borderTop: "24px solid #FF4D6A",
-      zIndex: 10,
-      filter: "drop-shadow(0px 4px 6px rgba(0,0,0,0.5))"
-    }} />
-  )
 
   const grandPrizes = rewards.filter(r => r.type === "grand")
 
   return (
-    <div style={{maxWidth:"600px",margin:"0 auto"}}>
+    <div style={{maxWidth:"640px",margin:"0 auto",position:"relative"}}>
+      {/* Confetti burst */}
+      {showConfetti && (
+        <div style={{position:"fixed",top:0,left:0,width:"100vw",height:"100vh",pointerEvents:"none",zIndex:999,overflow:"hidden"}}>
+          {Array.from({length:40}).map((_,i) => (
+            <div key={i} style={{
+              position:"absolute",
+              left:`${Math.random()*100}%`,
+              top:"-10px",
+              width:`${6+Math.random()*8}px`,
+              height:`${6+Math.random()*8}px`,
+              borderRadius:"2px",
+              background:["#F97316","#6366F1","#22C55E","#EC4899","#EAB308","#3B82F6"][Math.floor(Math.random()*6)],
+              animation:`confettiFall ${1.5+Math.random()*2}s ${Math.random()*0.5}s ease-in forwards`,
+              transform:`rotate(${Math.random()*360}deg)`
+            }} />
+          ))}
+          <style>{`@keyframes confettiFall{to{top:110vh;transform:rotate(720deg)}}`}</style>
+        </div>
+      )}
+
       <div style={{textAlign:"center",marginBottom:"2rem"}}>
-        <h2 style={{fontWeight:"800",marginBottom:"8px"}}>Launch Day Lucky Spin! 🎡</h2>
+        <h2 style={{fontWeight:"800",marginBottom:"8px",fontSize:"24px"}}>Daily Lucky Spin 🎡</h2>
         <p style={{color:"#9090A8",fontSize:"14px"}}>
-          Day 1 Launch Special: Spin the wheel of fortune to secure exclusive vouchers, LeoCoins, or one of our <strong>10 Global Grand Prizes!</strong>
+          One free spin every day! Win LeoCoins, vouchers, or a <strong style={{color:"#F97316"}}>Grand Prize</strong>! 🏆
         </p>
+        {userEmail && (
+          <div style={{marginTop:"8px",display:"inline-flex",alignItems:"center",gap:"6px",background:"#16161F",border:"1px solid #2A2A38",borderRadius:"20px",padding:"4px 12px"}}>
+            <span style={{fontSize:"12px",color:"#5A5A72"}}>Spinning as</span>
+            <span style={{fontSize:"12px",fontWeight:"700",color:"#F97316"}}>{userEmail}</span>
+          </div>
+        )}
       </div>
 
       <div style={{
-        background:"#16161F",
+        background:"linear-gradient(145deg, #16161F, #111118)",
         border:"1px solid #2A2A38",
-        borderRadius:"20px",
+        borderRadius:"24px",
         padding:"2.5rem 1.5rem",
         display:"flex",
         flexDirection:"column",
         alignItems:"center",
         position:"relative",
-        boxShadow:"0 8px 32px rgba(0,0,0,0.3)"
+        boxShadow:"0 16px 48px rgba(0,0,0,0.4)"
       }}>
-        {renderPointer()}
+        {/* Pointer arrow */}
+        <div style={{
+          position:"absolute",
+          top:"-2px",
+          left:"50%",
+          transform:"translateX(-50%)",
+          width:0,height:0,
+          borderLeft:"14px solid transparent",
+          borderRight:"14px solid transparent",
+          borderTop:"26px solid #FF4D6A",
+          zIndex:10,
+          filter:"drop-shadow(0 3px 6px rgba(0,0,0,0.5))"
+        }} />
 
-        <div style={{position:"relative",marginBottom:"2rem",width:"340px",height:"340px",display:"flex",alignItems:"center",justifyContent:"center"}}>
-          <canvas 
-            ref={canvasRef} 
-            width={340} 
-            height={340} 
-            style={{
-              borderRadius:"50%",
-              width:"340px",
-              height:"340px",
-              display:"block"
-            }} 
+        {/* Wheel */}
+        <div style={{position:"relative",marginBottom:"2rem",width:"360px",height:"360px",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <canvas
+            ref={canvasRef}
+            width={360}
+            height={360}
+            style={{borderRadius:"50%",width:"360px",height:"360px",display:"block",cursor:(!hasSpunToday&&!spinning)?"pointer":"default"}}
+            onClick={handleSpinClick}
           />
         </div>
 
-        {!hasSpun ? (
-          <div style={{width:"100%",maxWidth:"320px"}}>
-            <label style={{fontSize:"12px",color:"#9090A8",marginBottom:"8px",display:"block",textAlign:"center"}}>
-              Enter your email to verify event eligibility:
-            </label>
-            <input 
-              style={{...s.input,textAlign:"center",padding:"12px 14px",fontSize:"14px",marginBottom:"1rem"}} 
-              type="email" 
-              placeholder="name@student.edu.sg" 
-              value={email} 
-              disabled={spinning}
-              onChange={e=>setEmail(e.target.value)} 
-            />
+        {!hasSpunToday ? (
+          <div style={{width:"100%",maxWidth:"340px",textAlign:"center"}}>
             {errorMessage && (
-              <div style={{color:"#FF4D6A",fontSize:"12px",textAlign:"center",marginBottom:"1rem",fontWeight:"600"}}>
+              <div style={{color:"#FF4D6A",fontSize:"12px",marginBottom:"1rem",fontWeight:"600",background:"rgba(255,77,106,0.08)",borderRadius:"8px",padding:"8px 12px"}}>
                 {errorMessage}
               </div>
             )}
-            <button 
+            <button
               style={{
-                ...s.btn,
-                ...s.btnAccent,
+                ...s.btn,...s.btnAccent,
                 width:"100%",
-                padding:"14px",
-                fontSize:"15px",
+                padding:"15px",
+                fontSize:"16px",
                 fontWeight:"800",
                 letterSpacing:"0.05em",
-                borderRadius:"10px",
-                opacity:(spinning || checkingEligibility || !email) ? 0.6 : 1,
-                cursor:(spinning || checkingEligibility || !email) ? "not-allowed" : "pointer"
-              }} 
+                borderRadius:"12px",
+                boxShadow: spinning ? "none" : "0 4px 20px rgba(249,115,22,0.35)",
+                opacity:(spinning||checkingEligibility) ? 0.6 : 1,
+                cursor:(spinning||checkingEligibility) ? "not-allowed" : "pointer",
+                transition:"all 0.2s"
+              }}
               onClick={handleSpinClick}
-              disabled={spinning || checkingEligibility || !email}
+              disabled={spinning||checkingEligibility}
             >
-              {checkingEligibility ? "Checking eligibility... ⏳" : (spinning ? "SPINNING... 🦁" : "SPIN THE WHEEL ⚡")}
+              {checkingEligibility ? "⏳ Checking…" : spinning ? "🦁 Spinning…" : "⚡ SPIN NOW"}
             </button>
+            <div style={{marginTop:"10px",fontSize:"12px",color:"#5A5A72"}}>Or click the wheel to spin!</div>
           </div>
         ) : (
           <div style={{
             textAlign:"center",
-            padding:"1.5rem",
-            background:"rgba(34, 197, 94, 0.08)",
-            border:"1px dashed rgba(34, 197, 94, 0.4)",
-            borderRadius:"16px",
             width:"100%",
-            maxWidth:"360px"
+            maxWidth:"380px"
           }}>
-            <div style={{fontSize:"40px",marginBottom:"8px"}}>🎉</div>
-            <div style={{fontWeight:"800",fontSize:"18px",color:"#22C55E",marginBottom:"4px"}}>Congratulations!</div>
-            <p style={{fontSize:"13px",color:"#9090A8",margin:"0 0 1rem 0"}}>You spun the wheel and secured:</p>
+            {/* Prize result card */}
             <div style={{
-              background:"#0A0A0F",
-              border:"1px solid #2A2A38",
-              borderRadius:"10px",
-              padding:"10px 16px",
-              fontWeight:"800",
-              fontSize:"16px",
-              color:"#F97316",
-              display:"inline-block"
+              background:"linear-gradient(135deg, rgba(34,197,94,0.08), rgba(249,115,22,0.05))",
+              border:"1px solid rgba(34,197,94,0.25)",
+              borderRadius:"16px",
+              padding:"1.5rem",
+              marginBottom:"1.25rem"
             }}>
-              {wonPrize?.reward_name}
+              <div style={{fontSize:"36px",marginBottom:"8px"}}>🎉</div>
+              <div style={{fontWeight:"800",fontSize:"17px",color:"#22C55E",marginBottom:"4px"}}>You spun today!</div>
+              <p style={{fontSize:"13px",color:"#9090A8",margin:"0 0 1rem 0"}}>You won:</p>
+              <div style={{
+                background:"#0A0A0F",
+                border:"1px solid #2A2A38",
+                borderRadius:"10px",
+                padding:"10px 20px",
+                fontWeight:"800",
+                fontSize:"16px",
+                color:"#F97316",
+                display:"inline-block",
+                marginBottom:"6px"
+              }}>
+                {wonPrize?.reward_name || "—"}
+              </div>
+              <div style={{fontSize:"11px",color:"#5A5A72",marginTop:"8px"}}>
+                Reward linked to <strong style={{color:"#9090A8"}}>{userEmail}</strong>
+              </div>
             </div>
-            <div style={{fontSize:"11px",color:"#5A5A72",marginTop:"12px"}}>
-              Your reward has been saved. Vouchers are linked to <strong>{email || "your email"}</strong> and are active immediately!
+
+            {/* Countdown */}
+            <div style={{
+              background:"#111118",
+              border:"1px solid #2A2A38",
+              borderRadius:"12px",
+              padding:"1rem",
+              display:"flex",
+              flexDirection:"column",
+              alignItems:"center",
+              gap:"4px"
+            }}>
+              <div style={{fontSize:"12px",color:"#5A5A72",textTransform:"uppercase",letterSpacing:"0.08em"}}>Next spin in</div>
+              <div style={{
+                fontFamily:"'Courier New', monospace",
+                fontSize:"28px",
+                fontWeight:"900",
+                color:"#F97316",
+                letterSpacing:"0.1em",
+                textShadow:"0 0 12px rgba(249,115,22,0.4)"
+              }}>
+                {countdown || "--:--:--"}
+              </div>
+              <div style={{fontSize:"11px",color:"#5A5A72"}}>Resets at midnight 🕛</div>
             </div>
           </div>
         )}
       </div>
 
+      {/* Grand prizes tracker */}
       {grandPrizes.length > 0 && (
         <div style={{
           marginTop:"2rem",
@@ -512,7 +617,7 @@ function LuckySpin({ showToast }) {
           padding:"1.25rem 1.5rem"
         }}>
           <div style={{display:"flex",alignItems:"center",gap:"8px",fontWeight:"700",fontSize:"14px",marginBottom:"1rem",color:"#FF4D6A"}}>
-            <span>🎁</span> Global Grand Prize Left (Event Cap: 10 Total)
+            <span>🎁</span> Grand Prizes Remaining
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3, 1fr)",gap:"12px"}}>
             {grandPrizes.map(gp => {
@@ -520,19 +625,20 @@ function LuckySpin({ showToast }) {
               return (
                 <div key={gp.id} style={{
                   background:"#16161F",
-                  border:"1px solid "+(remaining > 0 ? "#2A2A38" : "rgba(255, 77, 106, 0.15)"),
+                  border:`1px solid ${remaining > 0 ? "#2A2A38" : "rgba(255,77,106,0.2)"}`,
                   borderRadius:"12px",
-                  padding:"10px",
+                  padding:"12px 8px",
                   textAlign:"center"
                 }}>
-                  <div style={{fontSize:"18px",marginBottom:"4px"}}>{gp.id === "macbook" ? "💻" : (gp.id === "iphone" ? "📱" : "🎮")}</div>
-                  <div style={{fontWeight:"600",fontSize:"11px",color:"#F0F0F5",marginBottom:"2px"}}>{gp.id === "macbook" ? "MacBook" : (gp.id === "iphone" ? "iPhone" : "PS5")}</div>
+                  <div style={{fontSize:"22px",marginBottom:"4px"}}>{gp.id==="macbook"?"💻":gp.id==="iphone"?"📱":"🎮"}</div>
+                  <div style={{fontWeight:"600",fontSize:"11px",color:"#F0F0F5",marginBottom:"4px"}}>{gp.id==="macbook"?"MacBook":gp.id==="iphone"?"iPhone":"PS5"}</div>
                   <div style={{
-                    fontSize:"11px",
-                    fontWeight:"800",
-                    color: remaining > 0 ? "#22C55E" : "#FF4D6A"
+                    fontSize:"12px",fontWeight:"800",
+                    color:remaining>0?"#22C55E":"#FF4D6A",
+                    background:remaining>0?"rgba(34,197,94,0.1)":"rgba(255,77,106,0.1)",
+                    borderRadius:"6px",padding:"2px 6px",display:"inline-block"
                   }}>
-                    {remaining > 0 ? `${remaining} Left` : "CLAIMED"}
+                    {remaining>0?`${remaining} Left`:"CLAIMED"}
                   </div>
                 </div>
               )
@@ -544,8 +650,17 @@ function LuckySpin({ showToast }) {
   )
 }
 
+
 export default function App() {
-  const [portal, setPortal] = useState(null)
+  const [session, setSession] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("leo_session") || "null") } catch { return null }
+  })
+  const [portal, setPortal] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("leo_session") || "null")
+      return s ? s.role : null
+    } catch { return null }
+  })
   const [view, setView] = useState("home")
   const [cart, setCart] = useState([])
   const [products, setProducts] = useState(defaultProducts)
@@ -569,6 +684,88 @@ export default function App() {
 
   const [checkoutEmail, setCheckoutEmail] = useState("")
   const [checkoutName, setCheckoutName] = useState("")
+  
+  const [userEmail, setUserEmail] = useState(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem("leo_session") || "null")
+      return s ? s.email : (localStorage.getItem("leo_user_email") || "")
+    } catch { return localStorage.getItem("leo_user_email") || "" }
+  })
+  const [walletBalance, setWalletBalance] = useState(0)
+  const [walletTransactions, setWalletTransactions] = useState([])
+  const [referralCode, setReferralCode] = useState("")
+  const [walletLoading, setWalletLoading] = useState(false)
+  const [tempEmail, setTempEmail] = useState("")
+  const [friendCode, setFriendCode] = useState("")
+  
+  const [bizWalletBalance, setBizWalletBalance] = useState(0)
+  const [bizTransactions, setBizTransactions] = useState([])
+
+  const fetchWalletData = async (email, isBiz = false) => {
+    if (!email) return
+    try {
+      const res = await fetch(`/api/wallet/balance?email=${encodeURIComponent(email)}`)
+      const data = await res.json()
+      if (data.success) {
+        if (isBiz) {
+          setBizWalletBalance(data.balance)
+          setBizTransactions(data.transactions)
+        } else {
+          setWalletBalance(data.balance)
+          setWalletTransactions(data.transactions)
+        }
+      }
+      
+      if (!isBiz) {
+        const refRes = await fetch(`/api/referral/code?email=${encodeURIComponent(email)}`)
+        const refData = await refRes.json()
+        if (refData.success) {
+          setReferralCode(refData.code)
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch wallet:", err)
+      const localBalKey = `leo_wallet_balance_${email}`
+      const localTxKey = `leo_wallet_txs_${email}`
+      const localRefKey = `leo_referral_code_${email}`
+      
+      const bal = parseInt(localStorage.getItem(localBalKey) || "0", 10)
+      let txs = []
+      try { txs = JSON.parse(localStorage.getItem(localTxKey) || "[]") } catch(e){}
+      
+      if (isBiz) {
+        setBizWalletBalance(bal)
+        setBizTransactions(txs)
+      } else {
+        setWalletBalance(bal)
+        setWalletTransactions(txs)
+        
+        let code = localStorage.getItem(localRefKey)
+        if (!code) {
+          code = `LEO-${Math.random().toString(36).substring(2, 6).toUpperCase()}`
+          localStorage.setItem(localRefKey, code)
+        }
+        setReferralCode(code)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (userEmail) {
+      fetchWalletData(userEmail, false)
+      setCheckoutEmail(userEmail)
+    } else {
+      setWalletBalance(0)
+      setWalletTransactions([])
+      setReferralCode("")
+    }
+  }, [userEmail])
+
+  useEffect(() => {
+    if (portal === "founder") {
+      fetchWalletData("clara@student.nus.edu.sg", true)
+    }
+  }, [portal])
   const [promoEligible, setPromoEligible] = useState(false)
   const [promoReason, setPromoReason] = useState("")
   const [promoChecking, setPromoChecking] = useState(false)
@@ -651,6 +848,7 @@ export default function App() {
       
       if (data.success) {
         localStorage.setItem(`ordered_${checkoutEmail}`, "true")
+        const currentEmail = checkoutEmail
         setCart([])
         setCheckoutEmail("")
         setCheckoutName("")
@@ -659,12 +857,68 @@ export default function App() {
         } else {
           showToast("🎉 Order placed successfully!")
         }
+        setUserEmail(currentEmail)
+        localStorage.setItem("leo_user_email", currentEmail)
+        fetchWalletData(currentEmail, false)
       } else {
         showToast("❌ Checkout failed: " + data.detail)
       }
     } catch (err) {
       console.error("Checkout failed:", err)
       localStorage.setItem(`ordered_${checkoutEmail}`, "true")
+      const currentEmail = checkoutEmail
+
+      const BIZ_OWNER_EMAILS = {
+        1: "clara@student.nus.edu.sg",
+        2: "marcus@student.ntu.edu.sg",
+        3: "priya@student.smu.edu.sg",
+        4: "alvin@student.ntu.edu.sg",
+        5: "sophie@student.nus.edu.sg"
+      }
+      
+      const balKey = `leo_wallet_balance_${currentEmail}`
+      const txKey = `leo_wallet_txs_${currentEmail}`
+      const currentBal = parseInt(localStorage.getItem(balKey) || "0", 10)
+      const amtPaid = promoEligible ? 2.0 : cartTotal
+      const cashbackEarned = Math.floor(amtPaid * 10)
+      
+      if (cashbackEarned > 0) {
+        const newBal = currentBal + cashbackEarned
+        localStorage.setItem(balKey, String(newBal))
+        let txs = []
+        try { txs = JSON.parse(localStorage.getItem(txKey) || "[]") } catch(e){}
+        txs.unshift({
+          amount: cashbackEarned,
+          type: "credit",
+          description: `Cashback for purchase of $${amtPaid.toFixed(2)} (Simulated)`,
+          created_at: new Date().toISOString()
+        })
+        localStorage.setItem(txKey, JSON.stringify(txs))
+      }
+      
+      cart.forEach(item => {
+        const ownerEmail = BIZ_OWNER_EMAILS[item.bizId || item.biz_id]
+        if (ownerEmail) {
+          const bizBalKey = `leo_wallet_balance_${ownerEmail}`
+          const bizTxKey = `leo_wallet_txs_${ownerEmail}`
+          let bizTxs = []
+          try { bizTxs = JSON.parse(localStorage.getItem(bizTxKey) || "[]") } catch(e){}
+          const hasSaleBonus = bizTxs.some(tx => tx.description.includes("First completed sale"))
+          if (!hasSaleBonus) {
+            const bizBal = parseInt(localStorage.getItem(bizBalKey) || "0", 10)
+            const newBizBal = bizBal + 1000
+            localStorage.setItem(bizBalKey, String(newBizBal))
+            bizTxs.unshift({
+              amount: 1000,
+              type: "credit",
+              description: "First completed sale bonus (Simulated)",
+              created_at: new Date().toISOString()
+            })
+            localStorage.setItem(bizTxKey, JSON.stringify(bizTxs))
+          }
+        }
+      })
+
       setCart([])
       setCheckoutEmail("")
       setCheckoutName("")
@@ -673,6 +927,9 @@ export default function App() {
       } else {
         showToast("🎉 Order placed successfully! (Local simulation)")
       }
+      setUserEmail(currentEmail)
+      localStorage.setItem("leo_user_email", currentEmail)
+      fetchWalletData(currentEmail, false)
     }
   }
 
@@ -716,7 +973,50 @@ export default function App() {
     if(error){ showToast("❌ Failed to add product"); console.error(error); return }
     setProducts(prev=>[...prev,{...data[0],bizId:data[0].biz_id,desc:data[0].description}])
     setNewProduct({name:"",desc:"",price:"",emoji:"",category:"Food & Drinks"})
-    showToast("✓ Product added!")
+
+    try {
+      const earnRes = await fetch("/api/wallet/earn-listing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: "clara@student.nus.edu.sg",
+          business_id: founderBiz.id
+        })
+      })
+      const earnData = await earnRes.json()
+      if (earnData.success) {
+        showToast("✓ Product added! Earned +200 LeoCoins! 🪙")
+        setBizWalletBalance(earnData.balance)
+        fetchWalletData("clara@student.nus.edu.sg", true)
+      } else {
+        showToast("✓ Product added!")
+      }
+    } catch (err) {
+      console.error("Listing reward failed, running fallback:", err)
+      const balKey = "leo_wallet_balance_clara@student.nus.edu.sg"
+      const txKey = "leo_wallet_txs_clara@student.nus.edu.sg"
+      const currentBal = parseInt(localStorage.getItem(balKey) || "0", 10)
+      
+      let txs = []
+      try { txs = JSON.parse(localStorage.getItem(txKey) || "[]") } catch(e){}
+      const alreadyRewarded = txs.some(tx => tx.description.includes("First product listing"))
+      if (!alreadyRewarded) {
+        const newBal = currentBal + 200
+        localStorage.setItem(balKey, String(newBal))
+        txs.unshift({
+          amount: 200,
+          type: "credit",
+          description: "First product listing bonus",
+          created_at: new Date().toISOString()
+        })
+        localStorage.setItem(txKey, JSON.stringify(txs))
+        setBizWalletBalance(newBal)
+        setBizTransactions(txs)
+        showToast("✓ Product added! Earned +200 LeoCoins! (Simulated) 🪙")
+      } else {
+        showToast("✓ Product added!")
+      }
+    }
   }
 
   const deleteProduct = async (id) => {
@@ -770,31 +1070,14 @@ export default function App() {
   const getBizReviews = (bizId) => reviews.filter(r=>r.type==="business"&&r.target_id===String(bizId))
   const getProductReviews = (productId) => reviews.filter(r=>r.type==="product"&&r.target_id===String(productId))
 
-  // LANDING PAGE
-  if(!portal) return (
-    <div style={{...s.page,...s.center,position:"relative",overflow:"hidden"}}>
-      {/* Translucent lion watermark - smaller */}
-      <img src="/logo.png" alt="" style={{position:"absolute",width:"750px",height:"750px",top:"-80px",objectFit:"contain",opacity:0.15,pointerEvents:"none",zIndex:0,userSelect:"none"}} onError={e=>e.target.style.display="none"} />
-      {/* Business Owner button top left */}
-      <div style={{position:"absolute",top:"1rem",left:"1.5rem",zIndex:1}}>
-        <button onClick={()=>enterPortal("founder")} style={{background:"transparent",border:"1px solid #2A2A38",borderRadius:"8px",padding:"6px 14px",color:"#F0F0F5",fontSize:"13px",fontWeight:"600",cursor:"pointer",fontFamily:"inherit"}}>
-          Business Owner →
-        </button>
-      </div>
-      {/* Main content */}
-      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
-        <div style={{fontSize:"96px",fontWeight:"400",fontFamily:"'Pacifico',cursive",color:"#E8821A",lineHeight:1.1,marginBottom:"4px"}}>Leo</div>
-        <div style={s.sub}>Singapore's student marketplace</div>
-        <div style={s.cards}>
-          <div onClick={()=>enterPortal("consumer")} style={{...s.portalCard,width:"240px"}}>
-            <div style={{fontSize:"40px",marginBottom:"1rem"}}>🛍️</div>
-            <div style={{fontWeight:"700",fontSize:"18px",marginBottom:"6px"}}>Shop Now</div>
-            <div style={{fontSize:"13px",color:"#9090A8",marginBottom:"16px"}}>Discover & buy from student businesses</div>
-            <div style={{...s.btn,...s.btnAccent,display:"inline-block"}}>Enter →</div>
-          </div>
-        </div>
-      </div>
-    </div>
+  // LOGIN PAGE — show when no session
+  if (!session) return (
+    <Login onLogin={(sess) => {
+      setSession(sess)
+      setPortal(sess.role)
+      setUserEmail(sess.email)
+      setView("home")
+    }} />
   )
 
   if(loading) return (
@@ -819,14 +1102,37 @@ export default function App() {
             <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
             <button style={{...s.navBtn,...(view==="cart"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("cart")}>Cart {cartCount>0&&<span style={{background:"#F97316",color:"#0A0A0F",borderRadius:"50%",width:"16px",height:"16px",fontSize:"10px",fontWeight:"800",display:"inline-flex",alignItems:"center",justifyContent:"center",marginLeft:"4px"}}>{cartCount}</span>}</button>
             <button style={{...s.navBtn,...(view==="spin"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("spin")}>Lucky Spin 🎡</button>
+            <button style={{...s.navBtn,...(view==="wallet"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("wallet")}>
+              🪙 {userEmail ? `${walletBalance.toLocaleString()} Coins` : "Wallet"}
+            </button>
           </>}
           {portal==="founder"&&<>
             <button style={{...s.navBtn,...(view==="home"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("home")}>Dashboard</button>
             <button style={{...s.navBtn,...(view==="feed"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("feed")}>Feed 📱</button>
             <button style={{...s.navBtn,...(view==="products"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("products")}>Products</button>
+            <button style={{...s.navBtn,...(view==="wallet"?{background:"#1A1A24",color:"#F0F0F5"}:{})}} onClick={()=>setView("wallet")}>
+              🪙 {bizWalletBalance.toLocaleString()} Coins
+            </button>
           </>}
         </div>
-        <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={()=>setPortal(null)}>← Switch</button>
+        <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+          {session && (
+            <div style={{fontSize:"12px",color:"#9090A8",display:"flex",alignItems:"center",gap:"6px"}}>
+              <div style={{width:"26px",height:"26px",borderRadius:"50%",background:"linear-gradient(135deg,#F97316,#EA580C)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:"700",color:"#0A0A0F"}}>
+                {session.name ? session.name[0].toUpperCase() : "U"}
+              </div>
+              <span style={{maxWidth:"130px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{session.name || session.email}</span>
+            </div>
+          )}
+          <button style={{...s.btn,...s.btnOutline,fontSize:"12px"}} onClick={() => {
+            localStorage.removeItem("leo_session")
+            localStorage.removeItem("leo_user_email")
+            setSession(null)
+            setPortal(null)
+            setUserEmail("")
+            setView("home")
+          }}>Sign Out</button>
+        </div>
       </div>
 
       <div style={s.main}>
@@ -1069,7 +1375,253 @@ export default function App() {
 
         {/* LUCKY SPIN EVENT */}
         {portal==="consumer"&&view==="spin"&&(
-          <LuckySpin showToast={showToast} />
+          <LuckySpin 
+            showToast={showToast} 
+            userEmail={userEmail}
+            onSpinCompleted={(email) => {
+              fetchWalletData(email, false)
+            }}
+          />
+        )}
+
+        {/* WALLET VIEW (BOTH CONSUMER AND FOUNDER) */}
+        {(portal==="consumer"||portal==="founder")&&view==="wallet"&&(
+          <div style={{maxWidth:"600px", margin:"0 auto"}}>
+            <div style={{marginBottom:"1.5rem"}}>
+              <h2 style={{fontWeight:"800", marginBottom:"4px"}}>LeoCash Wallet 🪙</h2>
+              <p style={{color:"#9090A8", fontSize:"14px"}}>
+                {portal==="founder" ? "Manage business earnings and bonuses" : "Manage your LeoCoins, referral rewards, and earnings"}
+              </p>
+            </div>
+            
+            {portal==="consumer" && !userEmail ? (
+              <div style={{background:"#16161F", border:"1px solid #2A2A38", borderRadius:"16px", padding:"2rem", textAlign:"center"}}>
+                <div style={{fontSize:"48px", marginBottom:"1rem"}}>🪙</div>
+                <h3 style={{fontWeight:"800", marginBottom:"8px"}}>Unlock Your Wallet</h3>
+                <p style={{color:"#9090A8", fontSize:"14px", marginBottom:"1.5rem"}}>
+                  Enter your student email address to check your balance, view transaction history, and refer friends!
+                </p>
+                <input 
+                  style={{...s.input, textAlign:"center", padding:"12px"}}
+                  type="email"
+                  placeholder="name@student.edu.sg"
+                  value={tempEmail}
+                  onChange={e => setTempEmail(e.target.value)}
+                />
+                <button 
+                  style={{...s.btn, ...s.btnAccent, width:"100%", padding:"12px", fontSize:"14px"}}
+                  onClick={() => {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+                    if (!emailRegex.test(tempEmail)) {
+                      showToast("⚠️ Please enter a valid email address.")
+                      return
+                    }
+                    setUserEmail(tempEmail.trim().lower())
+                    localStorage.setItem("leo_user_email", tempEmail.trim().lower())
+                    showToast("✓ Wallet Unlocked! 🎉")
+                  }}
+                >
+                  Access Wallet ⚡
+                </button>
+              </div>
+            ) : (
+              <div>
+                {/* Wallet Balance Card */}
+                <div style={{
+                  background: "linear-gradient(135deg, #1E1B4B 0%, #111118 100%)",
+                  border: "1px solid #312E81",
+                  borderRadius: "20px",
+                  padding: "2rem",
+                  boxShadow: "0 8px 32px rgba(99, 102, 241, 0.15)",
+                  textAlign: "center",
+                  marginBottom: "2rem",
+                  position: "relative",
+                  overflow: "hidden"
+                }}>
+                  <div style={{
+                    position: "absolute",
+                    top: "-50px",
+                    left: "-50px",
+                    width: "150px",
+                    height: "150px",
+                    background: "rgba(249, 115, 22, 0.15)",
+                    filter: "blur(50px)",
+                    borderRadius: "50%"
+                  }} />
+                  <div style={{fontSize:"13px", color:"#9090A8", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:"8px"}}>Available Balance</div>
+                  <div style={{fontSize:"40px", fontWeight:"900", color:"#F97316", textShadow:"0 0 10px rgba(249, 115, 22, 0.3)"}}>
+                    🪙 {(portal==="founder" ? bizWalletBalance : walletBalance).toLocaleString()} <span style={{fontSize:"20px", fontWeight:"600", color:"#9090A8"}}>LeoCoins</span>
+                  </div>
+                  <div style={{fontSize:"12px", color:"#5A5A72", marginTop:"6px"}}>
+                    Linked to {portal==="founder" ? "clara@student.nus.edu.sg (Crème by Clara)" : userEmail}
+                  </div>
+                  {portal==="consumer" && (
+                    <button 
+                      style={{...s.btn, ...s.btnOutline, fontSize:"11px", padding:"4px 10px", marginTop:"14px"}} 
+                      onClick={() => {
+                        setUserEmail("")
+                        localStorage.removeItem("leo_user_email")
+                        showToast("Wallet Disconnected")
+                      }}
+                    >
+                      Switch Account ➔
+                    </button>
+                  )}
+                </div>
+
+                {/* Consumer Referral Panel */}
+                {portal==="consumer" && (
+                  <div style={{background:"#16161F", border:"1px solid #2A2A38", borderRadius:"16px", padding:"1.5rem", marginBottom:"2rem"}}>
+                    <h3 style={{fontWeight:"800", fontSize:"15px", marginBottom:"8px", color:"#F97316"}}>Refer Friends, Earn Together! 🤝</h3>
+                    <p style={{color:"#9090A8", fontSize:"13px", marginBottom:"1.25rem"}}>
+                      Share your unique code. When a friend redeems it, you both get **500 LeoCoins** instantly!
+                    </p>
+                    
+                    <div style={{display:"flex", gap:"8px", marginBottom:"1.25rem", alignItems:"center"}}>
+                      <div style={{
+                        background:"#0A0A0F", 
+                        border:"1px dashed #2A2A38", 
+                        borderRadius:"8px", 
+                        padding:"10px 14px", 
+                        fontWeight:"800", 
+                        fontSize:"16px", 
+                        letterSpacing:"0.05em",
+                        color:"#F97316",
+                        flex: 1,
+                        textAlign:"center"
+                      }}>
+                        {referralCode}
+                      </div>
+                      <button 
+                        style={{...s.btn, ...s.btnAccent, height:"42px"}} 
+                        onClick={() => {
+                          navigator.clipboard.writeText(referralCode)
+                          showToast("📋 Referral Code Copied!")
+                        }}
+                      >
+                        Copy Code
+                      </button>
+                    </div>
+                    
+                    <div style={{borderTop:"1px solid #2A2A38", paddingTop:"1.25rem"}}>
+                      <label style={{fontSize:"12px", color:"#9090A8", marginBottom:"6px", display:"block"}}>Have a referral code? Redeem it here:</label>
+                      <div style={{display:"flex", gap:"8px"}}>
+                        <input 
+                          style={{...s.input, marginBottom:0, flex:1}} 
+                          placeholder="Enter friend's LEO-XXXX code" 
+                          value={friendCode}
+                          onChange={e => setFriendCode(e.target.value)}
+                        />
+                        <button 
+                          style={{...s.btn, ...s.btnSuccess}}
+                          onClick={async () => {
+                            if (!friendCode) return
+                            try {
+                              const res = await fetch("/api/referral/claim", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ email: userEmail, code: friendCode })
+                              })
+                              const data = await res.json()
+                              if (!res.ok || !data.success) {
+                                showToast("❌ " + (data.detail || "Failed to claim referral"))
+                              } else {
+                                showToast("🎉 " + data.message)
+                                fetchWalletData(userEmail, false)
+                                setFriendCode("")
+                              }
+                            } catch (err) {
+                              console.error("Referral claim failed, simulating fallback:", err)
+                              const codeClean = friendCode.trim().toUpperCase()
+                              if (codeClean === referralCode.toUpperCase()) {
+                                showToast("❌ You cannot redeem your own referral code!")
+                                return
+                              }
+                              
+                              const claimedKey = `leo_claimed_referral_${userEmail}`
+                              if (localStorage.getItem(claimedKey)) {
+                                showToast("❌ You have already claimed a referral code!")
+                                return
+                              }
+                              
+                              localStorage.setItem(claimedKey, "true")
+                              const balKey = `leo_wallet_balance_${userEmail}`
+                              const txKey = `leo_wallet_txs_${userEmail}`
+                              const currentBal = parseInt(localStorage.getItem(balKey) || "0", 10)
+                              const newBal = currentBal + 500
+                              localStorage.setItem(balKey, String(newBal))
+                              
+                              let txs = []
+                              try { txs = JSON.parse(localStorage.getItem(txKey) || "[]") } catch(e){}
+                              txs.unshift({
+                                amount: 500,
+                                type: "credit",
+                                description: "Referral welcome bonus",
+                                created_at: new Date().toISOString()
+                              })
+                              localStorage.setItem(txKey, JSON.stringify(txs))
+                              
+                              setWalletBalance(newBal)
+                              setWalletTransactions(txs)
+                              setFriendCode("")
+                              showToast("🎉 Welcome bonus claimed! +500 LeoCoins! (Simulated) 🪙")
+                            }
+                          }}
+                        >
+                          Redeem
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Transactions Ledger */}
+                <div style={{marginBottom:"1.5rem"}}>
+                  <h3 style={{fontWeight:"800", fontSize:"16px", marginBottom:"1rem"}}>Transaction Ledger</h3>
+                  {(portal === "founder" ? bizTransactions : walletTransactions).length === 0 ? (
+                    <div style={{textAlign:"center", padding:"2rem", color:"#5A5A72", border:"1px dashed #2A2A38", borderRadius:"12px"}}>
+                      No transactions recorded yet.
+                    </div>
+                  ) : (
+                    <div>
+                      {(portal === "founder" ? bizTransactions : walletTransactions).map((tx, idx) => (
+                        <div key={idx} style={{
+                          background: "#16161F",
+                          border: "1px solid #2A2A38",
+                          borderRadius: "12px",
+                          padding: "1rem",
+                          marginBottom: "8px",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center"
+                        }}>
+                          <div>
+                            <div style={{fontWeight:"600", fontSize:"13px"}}>{tx.description}</div>
+                            <div style={{fontSize:"11px", color:"#5A5A72", marginTop:"4px"}}>
+                              {new Date(tx.created_at).toLocaleString("en-SG", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit"
+                              })}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontWeight: "800", 
+                            color: tx.amount >= 0 ? "#22C55E" : "#FF4D6A",
+                            fontSize: "14px"
+                          }}>
+                            {tx.amount >= 0 ? `+${tx.amount}` : tx.amount} 🪙
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* BUSINESS OWNER DASHBOARD */}
@@ -1080,7 +1632,7 @@ export default function App() {
               <div><div style={{fontWeight:"700",fontSize:"18px"}}>{founderBiz.name}</div><div style={{color:"#9090A8",fontSize:"13px"}}>{founderBiz.category} · {founderBiz.uni} · <span style={{color:"#22C55E",fontWeight:"600"}}>✓ Approved</span></div></div>
             </div>
             <div style={s.statsGrid}>
-              {[["Products",founderProducts.length,"Listed"],["Reviews",getBizReviews(founderBiz.id).length,"Received"],["Views","142","This week"],["Orders","3","All time"]].map(([l,v,sub])=>(
+              {[["Products",founderProducts.length,"Listed"],["Reviews",getBizReviews(founderBiz.id).length,"Received"],["LeoCoins Balance",bizWalletBalance + " 🪙","Wallet earnings"],["Orders","3","All time"]].map(([l,v,sub])=>(
                 <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#F97316"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
               ))}
             </div>
