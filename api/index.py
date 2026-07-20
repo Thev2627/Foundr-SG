@@ -639,6 +639,27 @@ def get_wallet_balance(email: str = Query(..., description="Customer email addre
         raise HTTPException(status_code=400, detail="Invalid email format")
         
     state = load_wallet_state()
+    
+    # Ensure default values are written if missing
+    updated_state = False
+    if email_clean == "student@student.edu.sg" and "student@student.edu.sg" not in state["wallets"]:
+        state["wallets"]["student@student.edu.sg"] = 600
+        state["transactions"]["student@student.edu.sg"] = [
+            {"amount": 500, "type": "credit", "description": "Referral welcome bonus", "created_at": datetime.now().isoformat()},
+            {"amount": 100, "type": "credit", "description": "Lucky Spin Reward (100 LeoCoins)", "created_at": datetime.now().isoformat()}
+        ]
+        updated_state = True
+    elif email_clean == "clara@student.nus.edu.sg" and "clara@student.nus.edu.sg" not in state["wallets"]:
+        state["wallets"]["clara@student.nus.edu.sg"] = 1200
+        state["transactions"]["clara@student.nus.edu.sg"] = [
+            {"amount": 1000, "type": "credit", "description": "First completed sale bonus", "created_at": datetime.now().isoformat()},
+            {"amount": 200, "type": "credit", "description": "First product listing bonus", "created_at": datetime.now().isoformat()}
+        ]
+        updated_state = True
+        
+    if updated_state:
+        save_wallet_state(state)
+        
     balance = state["wallets"].get(email_clean, 0)
     transactions = state["transactions"].get(email_clean, [])
     
@@ -778,7 +799,7 @@ def earn_listing(req: EarnListingRequest):
     mapped_email = BIZ_OWNER_EMAILS.get(req.business_id)
     if not mapped_email or mapped_email != email_clean:
         raise HTTPException(status_code=400, detail="Unauthorized business mapping")
-        
+    
     # Check if they have already claimed product listing reward
     state = load_wallet_state()
     txs = state["transactions"].get(email_clean, [])
@@ -793,5 +814,109 @@ def earn_listing(req: EarnListingRequest):
         "balance": new_bal,
         "message": "Congratulations! You earned 200 LeoCoins for listing your first product! 🪙"
     }
+
+@app.get("/api/founder/dashboard")
+def get_founder_dashboard(email: str = Query(..., description="Founder email address")):
+    email_clean = email.strip().lower()
+    
+    # Identify which business_id belongs to this founder
+    biz_id = None
+    for k, v in BIZ_OWNER_EMAILS.items():
+        if v.lower() == email_clean:
+            biz_id = k
+            break
+            
+    if not biz_id:
+        raise HTTPException(status_code=404, detail="Founder business not found")
+        
+    # Get products for this business from Supabase, or use hardcoded/default if db check fails
+    products_list = []
+    try:
+        res = supabase_client.table("products").select("*").eq("biz_id", biz_id).execute()
+        products_list = res.data or []
+    except Exception:
+        # Fallback list matching defaults in App.jsx
+        if biz_id == 1:
+            products_list = [
+                {"id": 1, "name": "Croissant Box (6 pcs)", "price": 22, "category": "Food & Drinks"},
+                {"id": 2, "name": "Matcha Madeleine Set", "price": 18, "category": "Food & Drinks"}
+            ]
+        else:
+            products_list = []
+            
+    # Mock view stats, conversion rate calculations, and price recommendation logic
+    # Views are simulated statically or saved locally
+    # Sales/Revenue are calculated by counting orders from the database or mock orders.
+    sales_by_product = {}
+    revenue_by_product = {}
+    total_sales = 0
+    total_revenue = 0.0
+    
+    try:
+        orders_res = supabase_client.table("orders").select("*").eq("business_id", biz_id).execute()
+        orders = orders_res.data or []
+        for o in orders:
+            pid = o.get("product_id")
+            price = float(o.get("price_paid", 0))
+            sales_by_product[pid] = sales_by_product.get(pid, 0) + 1
+            revenue_by_product[pid] = revenue_by_product.get(pid, 0.0) + price
+            total_sales += 1
+            total_revenue += price
+    except Exception:
+        # Local mock order data
+        # Let's say Product 1 has 2 orders, Product 2 has 1 order
+        sales_by_product = {1: 2, 2: 1}
+        revenue_by_product = {1: 44.0, 2: 18.0}
+        total_sales = 3
+        total_revenue = 62.0
+
+    # Let's construct a list of product metrics with recommended prices
+    product_metrics = []
+    for p in products_list:
+        pid = p["id"]
+        p_name = p["name"]
+        p_price = float(p["price"])
+        p_sales = sales_by_product.get(pid, 0)
+        p_rev = revenue_by_product.get(pid, 0.0)
+        
+        # Simulating view count: (sales * random factor) + base views
+        # If no sales, let's say it has 15 views.
+        p_views = (p_sales * 7) + 15
+        conversion_rate = round((p_sales / p_views) * 100, 1) if p_views > 0 else 0.0
+        
+        # Recommendation logic:
+        # - High conversion (> 15%): recommend a slight price increase (+5% to +10%)
+        # - Low conversion (< 5%): recommend a slight price drop (-10%)
+        # - Good rating/default: recommend standard pricing
+        if conversion_rate > 15.0:
+            rec_price = round(p_price * 1.10, 2)
+            rec_reason = "High conversion rate! Increasing the price slightly will maximize profit margins."
+        elif conversion_rate < 5.0 and p_views > 10:
+            rec_price = round(p_price * 0.90, 2)
+            rec_reason = "Low conversion rate. Try lowering the price to stimulate sales."
+        else:
+            rec_price = p_price
+            rec_reason = "Healthy conversion rate. Current price is optimal!"
+            
+        product_metrics.append({
+            "id": pid,
+            "name": p_name,
+            "price": p_price,
+            "views": p_views,
+            "sales": p_sales,
+            "revenue": p_rev,
+            "conversion_rate": conversion_rate,
+            "recommended_price": rec_price,
+            "recommendation_reason": rec_reason
+        })
+        
+    return {
+        "success": True,
+        "business_id": biz_id,
+        "total_sales": total_sales,
+        "total_revenue": total_revenue,
+        "product_metrics": product_metrics
+    }
+
 
 

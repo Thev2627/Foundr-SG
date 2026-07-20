@@ -432,6 +432,25 @@ function LuckySpin({ showToast, userEmail, onSpinCompleted }) {
         localStorage.setItem(spinKey(), "true")
         localStorage.setItem(spinResultKey(), JSON.stringify(spinResult))
 
+        // Update local storage balance if won coins in local simulation/offline mode
+        if (spinResult.reward_id.startsWith("leo_coins_")) {
+          const coinsWon = parseInt(spinResult.reward_id.split("_")[2], 10)
+          const balKey = `leo_wallet_balance_${userEmail}`
+          const currentBal = parseInt(localStorage.getItem(balKey) || "600", 10)
+          localStorage.setItem(balKey, String(currentBal + coinsWon))
+
+          const txKey = `leo_wallet_txs_${userEmail}`
+          let txs = []
+          try { txs = JSON.parse(localStorage.getItem(txKey) || "[]") } catch(e){}
+          txs.unshift({
+            amount: coinsWon,
+            type: "credit",
+            description: `Lucky Spin Reward (${spinResult.reward_name})`,
+            created_at: new Date().toISOString()
+          })
+          localStorage.setItem(txKey, JSON.stringify(txs))
+        }
+
         showToast(`🎉 You won: ${spinResult.reward_name}!`)
         fetchRewards()
         startCountdown()
@@ -684,6 +703,42 @@ export default function App() {
 
   const [checkoutEmail, setCheckoutEmail] = useState("")
   const [checkoutName, setCheckoutName] = useState("")
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentCardNumber, setPaymentCardNumber] = useState("")
+  const [paymentExpiry, setPaymentExpiry] = useState("")
+  const [paymentCvv, setPaymentCvv] = useState("")
+  const [paymentProcessing, setPaymentProcessing] = useState(false)
+  const [dashboardMetrics, setDashboardMetrics] = useState(null)
+  const [dashboardLoading, setDashboardLoading] = useState(false)
+
+  const fetchDashboardData = async () => {
+    setDashboardLoading(true)
+    try {
+      const res = await fetch("/api/founder/dashboard?email=clara@student.nus.edu.sg")
+      const data = await res.json()
+      if (data.success) {
+        setDashboardMetrics(data)
+      }
+    } catch (err) {
+      console.error("Failed to fetch dashboard metrics:", err)
+    }
+    setDashboardLoading(false)
+  }
+
+  const handleApplyRecommendedPrice = async (productId, newPrice) => {
+    // Optimistic frontend update first
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, price: newPrice } : p))
+    // Update DB
+    try {
+      const { error } = await supabase.from("products").update({ price: newPrice }).eq("id", productId)
+      if (error) throw error
+      showToast("✓ Applied recommended price!")
+      fetchDashboardData()
+    } catch (err) {
+      console.error("Failed to update price:", err)
+      showToast("❌ Failed to update price in database")
+    }
+  }
   
   const [userEmail, setUserEmail] = useState(() => {
     try {
@@ -729,7 +784,14 @@ export default function App() {
       const localTxKey = `leo_wallet_txs_${email}`
       const localRefKey = `leo_referral_code_${email}`
       
-      const bal = parseInt(localStorage.getItem(localBalKey) || "0", 10)
+      let defaultBal = "0"
+      if (email === "student@student.edu.sg") {
+        defaultBal = "600"
+      } else if (email === "clara@student.nus.edu.sg") {
+        defaultBal = "1200"
+      }
+      
+      const bal = parseInt(localStorage.getItem(localBalKey) || defaultBal, 10)
       let txs = []
       try { txs = JSON.parse(localStorage.getItem(localTxKey) || "[]") } catch(e){}
       
@@ -754,6 +816,13 @@ export default function App() {
     if (userEmail) {
       fetchWalletData(userEmail, false)
       setCheckoutEmail(userEmail)
+      
+      // Real-time polling: update wallet data every 5 seconds
+      const pollInterval = setInterval(() => {
+        fetchWalletData(userEmail, false)
+      }, 5000)
+      
+      return () => clearInterval(pollInterval)
     } else {
       setWalletBalance(0)
       setWalletTransactions([])
@@ -764,6 +833,15 @@ export default function App() {
   useEffect(() => {
     if (portal === "founder") {
       fetchWalletData("clara@student.nus.edu.sg", true)
+      fetchDashboardData()
+      
+      // Real-time polling for business wallet & dashboard metrics
+      const pollInterval = setInterval(() => {
+        fetchWalletData("clara@student.nus.edu.sg", true)
+        fetchDashboardData()
+      }, 5000)
+      
+      return () => clearInterval(pollInterval)
     }
   }, [portal])
   const [promoEligible, setPromoEligible] = useState(false)
@@ -815,7 +893,7 @@ export default function App() {
     return () => clearTimeout(timer)
   }, [checkoutEmail, cart])
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (!checkoutEmail || !checkoutName) {
       showToast("⚠️ Please fill in your name and email to checkout")
       return
@@ -825,7 +903,20 @@ export default function App() {
       showToast("⚠️ Please enter a valid email address")
       return
     }
+    // Show Stripe payment modal
+    setShowPaymentModal(true)
+  }
 
+  const handlePaymentConfirm = async () => {
+    if (!paymentCardNumber || !paymentExpiry || !paymentCvv) {
+      showToast("⚠️ Please fill in card details")
+      return
+    }
+    
+    setPaymentProcessing(true)
+    // Simulate 2s card authorization delay
+    await new Promise(r => setTimeout(r, 2000))
+    
     try {
       const items = cart.map(item => ({
         product_id: item.id,
@@ -855,11 +946,15 @@ export default function App() {
         if (data.is_promo_applied) {
           showToast("🎉 Onboarding Promo Applied! Flat $2 Order secured!")
         } else {
-          showToast("🎉 Order placed successfully!")
+          showToast("🎉 Order placed successfully via Mock Stripe!")
         }
         setUserEmail(currentEmail)
         localStorage.setItem("leo_user_email", currentEmail)
         fetchWalletData(currentEmail, false)
+        setShowPaymentModal(false)
+        setPaymentCardNumber("")
+        setPaymentExpiry("")
+        setPaymentCvv("")
       } else {
         showToast("❌ Checkout failed: " + data.detail)
       }
@@ -925,12 +1020,17 @@ export default function App() {
       if (promoEligible) {
         showToast("🎉 Onboarding Promo Applied! Flat $2 Order secured! (Local simulation)")
       } else {
-        showToast("🎉 Order placed successfully! (Local simulation)")
+        showToast("🎉 Order placed successfully via Mock Stripe! (Local simulation)")
       }
       setUserEmail(currentEmail)
       localStorage.setItem("leo_user_email", currentEmail)
       fetchWalletData(currentEmail, false)
+      setShowPaymentModal(false)
+      setPaymentCardNumber("")
+      setPaymentExpiry("")
+      setPaymentCvv("")
     }
+    setPaymentProcessing(false)
   }
 
   useEffect(()=>{ loadAll() },[])
@@ -1370,6 +1470,76 @@ export default function App() {
                 </button>
               </div>
             </div>}
+
+            {/* Premium Stripe elements payment overlay modal */}
+            {showPaymentModal && (
+              <div style={{
+                position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+                background: "rgba(10, 10, 15, 0.8)", backdropFilter: "blur(8px)",
+                display: "flex", alignItems: "center", justifyOrigin: "center", justifyContent: "center",
+                zIndex: 9999
+              }}>
+                <div style={{
+                  background: "#16161F", border: "1px solid #2A2A38", borderRadius: "16px",
+                  padding: "2rem", width: "100%", maxWidth: "400px", boxShadow: "0 24px 60px rgba(0,0,0,0.6)"
+                }}>
+                  <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1.5rem"}}>
+                    <h3 style={{fontWeight:"800", fontSize:"18px", color:"#F97316"}}>💳 Stripe Secure Checkout</h3>
+                    <button style={{background:"transparent", border:"none", color:"#9090A8", cursor:"pointer", fontSize:"18px"}} onClick={() => setShowPaymentModal(false)}>✕</button>
+                  </div>
+                  
+                  <div style={{background:"#111118", border:"1px solid #2A2A38", borderRadius:"8px", padding:"10px 14px", marginBottom:"1.5rem", display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+                    <span style={{fontSize:"13px", color:"#9090A8"}}>Total Amount Payable:</span>
+                    <span style={{fontSize:"16px", fontWeight:"800", color:"#22C55E"}}>${promoEligible ? "2.00" : cartTotal.toFixed(2)}</span>
+                  </div>
+
+                  <div style={{marginBottom:"1rem"}}>
+                    <label style={{fontSize:"12px", color:"#9090A8", display:"block", marginBottom:"6px"}}>Card Number</label>
+                    <input 
+                      style={s.input} 
+                      placeholder="4242 4242 4242 4242"
+                      value={paymentCardNumber}
+                      onChange={e => setPaymentCardNumber(e.target.value.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim())}
+                      maxLength={19}
+                    />
+                  </div>
+
+                  <div style={{display:"flex", gap:"1rem", marginBottom:"1.5rem"}}>
+                    <div style={{flex: 1}}>
+                      <label style={{fontSize:"12px", color:"#9090A8", display:"block", marginBottom:"6px"}}>Expiry Date</label>
+                      <input 
+                        style={s.input} 
+                        placeholder="MM/YY" 
+                        value={paymentExpiry}
+                        onChange={e => setPaymentExpiry(e.target.value)}
+                        maxLength={5}
+                      />
+                    </div>
+                    <div style={{flex: 1}}>
+                      <label style={{fontSize:"12px", color:"#9090A8", display:"block", marginBottom:"6px"}}>CVC / CVV</label>
+                      <input 
+                        style={s.input} 
+                        placeholder="123" 
+                        value={paymentCvv}
+                        onChange={e => setPaymentCvv(e.target.value)}
+                        maxLength={4}
+                      />
+                    </div>
+                  </div>
+
+                  <button 
+                    style={{...s.btn, ...s.btnAccent, width:"100%", padding:"12px", fontSize:"14px", fontWeight:"700"}}
+                    onClick={handlePaymentConfirm}
+                    disabled={paymentProcessing}
+                  >
+                    {paymentProcessing ? "⚡ Processing Payment via Stripe..." : `Pay $${promoEligible ? "2.00" : cartTotal.toFixed(2)} Now`}
+                  </button>
+                  <div style={{textAlign:"center", marginTop:"10px", fontSize:"11px", color:"#5A5A72"}}>
+                    🔒 Powered by Stripe Sandbox
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1631,10 +1801,117 @@ export default function App() {
               <div style={{fontSize:"32px",width:"56px",height:"56px",background:"#1A1A24",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center"}}>{founderBiz.emoji}</div>
               <div><div style={{fontWeight:"700",fontSize:"18px"}}>{founderBiz.name}</div><div style={{color:"#9090A8",fontSize:"13px"}}>{founderBiz.category} · {founderBiz.uni} · <span style={{color:"#22C55E",fontWeight:"600"}}>✓ Approved</span></div></div>
             </div>
+            
             <div style={s.statsGrid}>
-              {[["Products",founderProducts.length,"Listed"],["Reviews",getBizReviews(founderBiz.id).length,"Received"],["LeoCoins Balance",bizWalletBalance + " 🪙","Wallet earnings"],["Orders","3","All time"]].map(([l,v,sub])=>(
-                <div key={l} style={s.statCard}><div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div><div style={{fontSize:"28px",fontWeight:"800",color:"#F97316"}}>{v}</div><div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div></div>
+              {[
+                ["Products Listed", founderProducts.length, "Active items"],
+                ["Total Sales", dashboardMetrics?.total_sales ?? 3, "Orders completed"],
+                ["Total Revenue", `$${(dashboardMetrics?.total_revenue ?? 62.0).toFixed(2)}`, "All time earnings"],
+                ["LeoCoins Balance", `${bizWalletBalance} 🪙`, "Available balance"]
+              ].map(([l,v,sub])=>(
+                <div key={l} style={s.statCard}>
+                  <div style={{fontSize:"11px",color:"#9090A8",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:"6px"}}>{l}</div>
+                  <div style={{fontSize:"24px",fontWeight:"800",color:"#F97316"}}>{v}</div>
+                  <div style={{fontSize:"11px",color:"#5A5A72"}}>{sub}</div>
+                </div>
               ))}
+            </div>
+
+            {/* Visual Analytics Representation */}
+            <div style={{background:"#16161F", border:"1px solid #2A2A38", borderRadius:"12px", padding:"1.5rem", marginTop:"1.5rem"}}>
+              <h3 style={{fontWeight:"800", fontSize:"15px", marginBottom:"1.25rem", color:"#F97316"}}>📊 Sales & Views Distribution</h3>
+              <div style={{display:"flex", flexDirection:"column", gap:"1rem"}}>
+                {(dashboardMetrics?.product_metrics ?? [
+                  {name: "Croissant Box (6 pcs)", views: 29, sales: 2},
+                  {name: "Matcha Madeleine Set", views: 22, sales: 1}
+                ]).map(item => {
+                  const maxVal = Math.max(...(dashboardMetrics?.product_metrics ?? [
+                    {views: 29}, {views: 22}
+                  ]).map(i => i.views || 30), 30);
+                  const viewsPercent = (item.views / maxVal) * 100;
+                  const salesPercent = (item.sales / maxVal) * 100;
+                  return (
+                    <div key={item.id || item.name} style={{background:"#111118", border:"1px solid #2A2A38", borderRadius:"8px", padding:"1rem"}}>
+                      <div style={{fontWeight:"600", fontSize:"13px", marginBottom:"8px"}}>{item.name}</div>
+                      
+                      {/* Views Bar */}
+                      <div style={{marginBottom:"8px"}}>
+                        <div style={{display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#9090A8", marginBottom:"3px"}}>
+                          <span>Views (Blue)</span>
+                          <span>{item.views}</span>
+                        </div>
+                        <div style={{height:"6px", background:"#1A1A24", borderRadius:"3px", overflow:"hidden"}}>
+                          <div style={{width:`${viewsPercent}%`, height:"100%", background:"#3B82F6", borderRadius:"3px"}} />
+                        </div>
+                      </div>
+
+                      {/* Sales Bar */}
+                      <div>
+                        <div style={{display:"flex", justifyContent:"space-between", fontSize:"11px", color:"#9090A8", marginBottom:"3px"}}>
+                          <span>Sales (Orange)</span>
+                          <span>{item.sales}</span>
+                        </div>
+                        <div style={{height:"6px", background:"#1A1A24", borderRadius:"3px", overflow:"hidden"}}>
+                          <div style={{width:`${salesPercent}%`, height:"100%", background:"#F97316", borderRadius:"3px"}} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Price Recommendations & Analytics Table */}
+            <div style={{background:"#16161F", border:"1px solid #2A2A38", borderRadius:"12px", padding:"1.5rem", marginTop:"2rem"}}>
+              <h3 style={{fontWeight:"800", fontSize:"16px", marginBottom:"1.25rem", color:"#F97316"}}>⚡ Product Price Optimizer & Performance</h3>
+              {dashboardLoading && !dashboardMetrics ? (
+                <p style={{color:"#9090A8", fontSize:"13px"}}>Loading analytics...</p>
+              ) : (
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%", borderCollapse:"collapse", textAlign:"left", fontSize:"13px"}}>
+                    <thead>
+                      <tr style={{borderBottom:"1px solid #2A2A38", color:"#9090A8"}}>
+                        <th style={{padding:"10px 8px"}}>Product</th>
+                        <th style={{padding:"10px 8px"}}>Current Price</th>
+                        <th style={{padding:"10px 8px"}}>Views</th>
+                        <th style={{padding:"10px 8px"}}>Sales</th>
+                        <th style={{padding:"10px 8px"}}>Conv. Rate</th>
+                        <th style={{padding:"10px 8px"}}>Recommended Price</th>
+                        <th style={{padding:"10px 8px"}}>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(dashboardMetrics?.product_metrics ?? []).map(item => (
+                        <tr key={item.id} style={{borderBottom:"1px solid #1A1A24"}}>
+                          <td style={{padding:"12px 8px", fontWeight:"600"}}>{item.name}</td>
+                          <td style={{padding:"12px 8px", fontWeight:"700", color:"#F0F0F5"}}>${item.price.toFixed(2)}</td>
+                          <td style={{padding:"12px 8px"}}>{item.views}</td>
+                          <td style={{padding:"12px 8px"}}>{item.sales}</td>
+                          <td style={{padding:"12px 8px", color:item.conversion_rate > 15 ? "#22C55E" : item.conversion_rate < 5 ? "#FF4D6A" : "#9090A8"}}>
+                            {item.conversion_rate}%
+                          </td>
+                          <td style={{padding:"12px 8px"}}>
+                            <span style={{fontWeight:"700", color:"#22C55E"}}>${item.recommended_price.toFixed(2)}</span>
+                            <div style={{fontSize:"10px", color:"#9090A8", marginTop:"2px", maxWidth:"200px"}}>{item.recommendation_reason}</div>
+                          </td>
+                          <td style={{padding:"12px 8px"}}>
+                            {item.price !== item.recommended_price ? (
+                              <button 
+                                style={{...s.btn, ...s.btnAccent, fontSize:"11px", padding:"4px 8px"}}
+                                onClick={() => handleApplyRecommendedPrice(item.id, item.recommended_price)}
+                              >
+                                Apply
+                              </button>
+                            ) : (
+                              <span style={{color:"#5A5A72", fontSize:"11px"}}>Optimal</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
